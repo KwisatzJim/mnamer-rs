@@ -1,0 +1,35 @@
+[package]
+name = "mnamer-rs"
+version = "0.1.0"
+edition = "2021"
+description = "A terminal media file renamer, inspired by mnamer and RenameMyTVSeries."
+license = "MIT"
+
+[[bin]]
+name = "mnamer-rs"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "=4.4.18", features = ["derive"] }
+regex = "=1.10.3"
+once_cell = "=1.19.0"
+reqwest = { version = "=0.11.24", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "=1.0.196", features = ["derive"] }
+serde_json = "=1.0.113"
+toml = "=0.8.10"
+anyhow = "=1.0.79"
+thiserror = "=1.0.56"
+walkdir = "=2.4.0"
+dialoguer = "=0.11.0"
+console = "=0.15.8"
+directories = "=5.0.1"
+indexmap = "=2.5.0"
+url = "=2.5.0"
+zeroize = "=1.7.0"
+getrandom = "=0.2.15"
+tempfile = "=3.10.1"
+toml_edit = "=0.22.6"
+
+[profile.release]
+lto = true
+strip = true
