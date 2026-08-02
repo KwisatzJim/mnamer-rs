@@ -10,6 +10,12 @@ The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv   ->  The Matrix (1999).mkv
 Breaking.Bad.S05E14.Ozymandias.720p.WEB-DL.mp4 -> Breaking Bad - S05E14 - Ozymandias.mp4
 the.office.3x05.business.school.avi           -> The Office - S03E05 - Business School.avi
 ```
+<img width="1242" height="659" alt="Screenshot 2026-08-02 at 7 29 37 AM" src="https://github.com/user-attachments/assets/72c5d0a4-949b-4b03-80f9-80dce68e4b0c" />
+
+<img width="1242" height="659" alt="Screenshot 2026-08-02 at 7 29 44 AM" src="https://github.com/user-attachments/assets/a33bb2eb-ebbc-400a-bb2c-5748036b37a0" />
+
+<img width="1242" height="659" alt="Screenshot 2026-08-02 at 7 30 03 AM" src="https://github.com/user-attachments/assets/0632e9fe-03ed-448f-87f6-e45b4b229abe" />
+
 
 ## Building
 
