@@ -60,7 +60,7 @@ api_key = "your_tmdb_api_key_here"
 
 # Filename templates -- same placeholders as --format-movie / --format-episode
 format_movie = "{title} ({year}){ext}"
-format_episode = "{series} - S{season}E{episode} - {episode_title}{ext}"
+format_episode = "{series} - S{season}E{episode_range} - {episode_title}{ext}"
 
 # Only touch files with these extensions (no dots)
 extensions = ["mkv", "mp4", "avi", "mov", "wmv", "m4v", "flv", "webm", "ts"]
@@ -68,9 +68,9 @@ extensions = ["mkv", "mp4", "avi", "mov", "wmv", "m4v", "flv", "webm", "ts"]
 # Move renamed files here instead of renaming in place
 output_dir = "/home/you/Media"
 
-# Booleans -- same as the matching CLI flags. Note these can only be turned
-# ON by the config file; the CLI flag has no "off" form, so if you set e.g.
-# `batch = true` here you can't un-batch for a single run from the CLI.
+# Booleans -- same as the matching CLI flags. A true config value can be
+# disabled for one run with --no-lower, --no-scene, --no-recursive, or
+# --no-batch.
 lower = false
 scene = false
 recursive = false
@@ -89,7 +89,13 @@ mnamer-rs --recursive ~/Downloads/media
 # See what it would do without touching anything
 mnamer-rs --dry-run --recursive ~/Downloads/media
 
-# Non-interactive: auto-accept the top TMDb match for every file
+# Save a JSON Lines audit report with one outcome per processed file
+mnamer-rs --log rename-report.jsonl --recursive ~/Downloads/media
+
+# Rename matching .srt/.ass/.ssa/.sub/.vtt subtitle files with each video
+mnamer-rs --subtitles --recursive ~/Downloads/media
+
+# Non-interactive: accept the top TMDb match only when the title/year is confident
 mnamer-rs --batch --recursive ~/Downloads/media
 
 # Just show the parsed guess (title/year/season/episode) — no network calls
@@ -106,11 +112,20 @@ mnamer-rs --media episode ~/Downloads/some_show/
 
 # Custom naming templates
 mnamer-rs --format-movie "{title} [{year}]{ext}" \
-          --format-episode "{series}/Season {season}/{series} S{season}E{episode} {episode_title}{ext}" \
+          --format-episode "{series}/Season {season}/{series} S{season}E{episode_range} {episode_title}{ext}" \
           --batch --recursive ~/Downloads/media
 ```
 
 Run `mnamer-rs --help` for the full flag list.
+
+For multi-episode files, `{episode_range}` renders a range such as `03-E04`.
+Older templates using only `{episode}` now include the range automatically.
+If a template explicitly uses `{episode_end}` or `{episode_range}`, `{episode}`
+continues to mean the first episode number.
+
+The `--log` path must not already exist. Choose a new report filename for each
+run; existing reports and other files are never overwritten. Each completed
+record is flushed immediately, though this is not a guarantee against power loss.
 
 ## How it works
 
@@ -126,6 +141,37 @@ Run `mnamer-rs --help` for the full flag list.
 4. **Rename** — `src/rename.rs` renders your template, sanitizes illegal
    filename characters, and `src/main.rs` performs the move (falling back to
    copy+delete if `--output-dir` is on a different filesystem).
+
+When inputs would produce the same destination name and directory, ignoring the
+final extension (for example, `.mkv` versus `.mp4`), `mnamer-rs` treats them as
+duplicates. The selected file keeps its original extension; skipped files are
+left untouched. To choose between duplicates, `mnamer-rs` uses
+`ffprobe` (when installed) to prefer the video with the greatest actual height.
+If probing is unavailable, it falls back to filename tags such as `2160p`,
+`1080p`, and `720p`. When actual heights tie, a unique higher reported video
+bitrate wins only if all tied candidates report the same known video codec.
+Different or missing codecs, or missing/tied bitrates, leave the choice ambiguous
+and the files are skipped. Bitrate is a preference heuristic, not proof of visual quality.
+Each video probe has a 10-second timeout. A timed-out probe is stopped and
+filename resolution tags are used instead, with a warning identifying the file.
+If `ffprobe` cannot start, a warning explains the problem and the filename fallback.
+The executable must be on the renamer's `PATH`; a shell alias is not sufficient.
+For Homebrew on Apple Silicon, ensure `/opt/homebrew/bin` is on `PATH`.
+
+## Ambiguous episode numbers
+
+Ambiguous packed episode numbers such as `S01E0304` are reported as per-file
+failures before metadata lookup, rather than treated as movies. Other files
+continue processing. If you mean episodes 3 through 4, use `S01E03-E04` or
+`S01E03E04`. Three-digit episode numbers such as `S01E123` remain supported.
+The same validation is available without TMDb access using `--parse-only`.
+
+## Temporary TMDb failures
+
+TMDb requests retry temporary failures up to three times and honor `Retry-After`
+in seconds or HTTP-date form. Waits over 30 seconds, or exhausted rate-limit
+retries, defer subsequent lookups for the rest of the run; rerun later. Already
+resolved rename plans can still be applied. Deferred files are reported as failed.
 
 ## Tests
 

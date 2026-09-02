@@ -11,8 +11,11 @@ pub enum MediaType {
 /// Built-in fallback defaults, used only if neither the CLI flag nor the
 /// config file set a value.
 pub const DEFAULT_FORMAT_MOVIE: &str = "{title} ({year}){ext}";
-pub const DEFAULT_FORMAT_EPISODE: &str = "{series} - S{season}E{episode} - {episode_title}{ext}";
-pub const DEFAULT_EXTENSIONS: &[&str] = &["mkv", "mp4", "avi", "mov", "wmv", "m4v", "flv", "webm", "ts"];
+pub const DEFAULT_FORMAT_EPISODE: &str =
+    "{series} - S{season}E{episode_range} - {episode_title}{ext}";
+pub const DEFAULT_EXTENSIONS: &[&str] = &[
+    "mkv", "mp4", "avi", "mov", "wmv", "m4v", "flv", "webm", "ts",
+];
 
 /// mnamer-rs: a terminal media file renamer (mnamer / RenameMyTVSeries alike).
 ///
@@ -30,8 +33,12 @@ pub struct Args {
     pub targets: Vec<PathBuf>,
 
     /// Recurse into subdirectories
-    #[arg(short, long)]
+    #[arg(short, long, conflicts_with = "no_recursive")]
     pub recursive: bool,
+
+    /// Do not recurse, overriding recursive = true in config.toml
+    #[arg(long, conflicts_with = "recursive")]
+    pub no_recursive: bool,
 
     /// Force media type instead of auto-detecting from the filename
     #[arg(short = 'm', long, value_enum, default_value = "auto")]
@@ -42,8 +49,12 @@ pub struct Args {
     pub dry_run: bool,
 
     /// Non-interactive: always accept the best match automatically
-    #[arg(short = 'b', long)]
+    #[arg(short = 'b', long, conflicts_with = "no_batch")]
     pub batch: bool,
+
+    /// Use interactive matching, overriding batch = true in config.toml
+    #[arg(long, conflicts_with = "batch")]
+    pub no_batch: bool,
 
     /// Copy/move the file to this directory instead of renaming in place
     #[arg(short = 'o', long)]
@@ -64,18 +75,27 @@ pub struct Args {
     pub format_movie: Option<String>,
 
     /// Episode filename template.
-    /// Placeholders: {series} {year} {season} {episode} {episode_title} {ext}
-    /// [default: "{series} - S{season}E{episode} - {episode_title}{ext}", overridable in config.toml]
+    /// Placeholders: {series} {year} {season} {episode} {episode_end}
+    /// {episode_range} {episode_title} {ext}
+    /// [default: "{series} - S{season}E{episode_range} - {episode_title}{ext}", overridable in config.toml]
     #[arg(long)]
     pub format_episode: Option<String>,
 
     /// Lowercase the final filename
-    #[arg(long)]
+    #[arg(long, conflicts_with = "no_lower")]
     pub lower: bool,
 
+    /// Preserve normal case, overriding lower = true in config.toml
+    #[arg(long, conflicts_with = "lower")]
+    pub no_lower: bool,
+
     /// Scene-style output: spaces become dots
-    #[arg(long)]
+    #[arg(long, conflicts_with = "no_scene")]
     pub scene: bool,
+
+    /// Preserve spaces, overriding scene = true in config.toml
+    #[arg(long, conflicts_with = "scene")]
+    pub no_scene: bool,
 
     /// Skip the interactive confirmation and metadata lookup entirely;
     /// just report the parsed guess for each file
@@ -86,9 +106,16 @@ pub struct Args {
     #[arg(long)]
     pub config: Option<PathBuf>,
 
+    /// Write one JSON record per processed file to a new file (never overwrites)
+    #[arg(long)]
+    pub log: Option<PathBuf>,
+
+    /// Rename matching subtitle files alongside their video
+    #[arg(long)]
+    pub subtitles: bool,
+
     /// Only touch files with these extensions (comma separated, no dots).
     /// [default: mkv,mp4,avi,mov,wmv,m4v,flv,webm,ts, overridable in config.toml]
     #[arg(long, value_delimiter = ',')]
     pub extensions: Option<Vec<String>>,
 }
-
