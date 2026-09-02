@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Default, Deserialize)]
 pub struct FileConfig {
     pub api_key: Option<String>,
+    pub ffprobe_path: Option<PathBuf>,
     pub format_movie: Option<String>,
     pub format_episode: Option<String>,
     pub extensions: Option<Vec<String>>,

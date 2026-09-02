@@ -1,0 +1,13 @@
+/Users/jimkelley/programming_projects/mnamer-rs/target/debug/deps/toml-d888e56a55c7dfa8.d: /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/lib.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/map.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/value.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/de.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/ser.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/macros.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/edit.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/fmt.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/table.rs
+
+/Users/jimkelley/programming_projects/mnamer-rs/target/debug/deps/libtoml-d888e56a55c7dfa8.rmeta: /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/lib.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/map.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/value.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/de.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/ser.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/macros.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/edit.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/fmt.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/table.rs
+
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/lib.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/map.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/value.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/de.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/ser.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/macros.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/edit.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/fmt.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml-0.8.10/src/table.rs:

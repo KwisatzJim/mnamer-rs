@@ -58,6 +58,9 @@ All supported keys (all optional):
 ```toml
 api_key = "your_tmdb_api_key_here"
 
+# Optional absolute path to ffprobe; otherwise it is found on PATH
+ffprobe_path = "/opt/homebrew/bin/ffprobe"
+
 # Filename templates -- same placeholders as --format-movie / --format-episode
 format_movie = "{title} ({year}){ext}"
 format_episode = "{series} - S{season}E{episode_range} - {episode_title}{ext}"
@@ -88,6 +91,9 @@ mnamer-rs --recursive ~/Downloads/media
 
 # See what it would do without touching anything
 mnamer-rs --dry-run --recursive ~/Downloads/media
+
+# Use ffprobe directly, without changing your shell PATH
+mnamer-rs --ffprobe /opt/homebrew/bin/ffprobe --dry-run --batch ~/Downloads/media
 
 # Save a JSON Lines audit report with one outcome per processed file
 mnamer-rs --log rename-report.jsonl --recursive ~/Downloads/media
@@ -139,8 +145,14 @@ record is flushed immediately, though this is not a guarantee against power loss
 3. **Confirm** — unless `--batch` is passed, you get an interactive picker
    (via `dialoguer`) to choose among the returned matches, or skip the file.
 4. **Rename** — `src/rename.rs` renders your template, sanitizes illegal
-   filename characters, and `src/main.rs` performs the move (falling back to
+   filename characters, and `src/operations.rs` performs the move (falling back to
    copy+delete if `--output-dir` is on a different filesystem).
+
+`src/main.rs` is only the command-line entry point. `src/workflow.rs` coordinates
+the stages, `src/scanning.rs` collects inputs and matches subtitles,
+`src/quality.rs` compares duplicate candidates, `src/model.rs` defines rename
+plans, and `src/report.rs` writes the JSON Lines log. Filesystem changes are
+isolated in `src/operations.rs` so their safety tests can run independently.
 
 When inputs would produce the same destination name and directory, ignoring the
 final extension (for example, `.mkv` versus `.mp4`), `mnamer-rs` treats them as
@@ -155,8 +167,37 @@ and the files are skipped. Bitrate is a preference heuristic, not proof of visua
 Each video probe has a 10-second timeout. A timed-out probe is stopped and
 filename resolution tags are used instead, with a warning identifying the file.
 If `ffprobe` cannot start, a warning explains the problem and the filename fallback.
-The executable must be on the renamer's `PATH`; a shell alias is not sufficient.
-For Homebrew on Apple Silicon, ensure `/opt/homebrew/bin` is on `PATH`.
+Each duplicate candidate displays its video height, codec, bitrate (if reported),
+and the information source (`ffprobe` or `filename tag`). Missing information is
+shown as unknown. The comparison explains when no unique preference is possible.
+As before, candidates with unknown resolution do not outrank candidates with
+known resolution; the output explicitly flags comparisons using only known data.
+
+Set `--ffprobe /absolute/path/to/ffprobe`, or set `ffprobe_path` in the config file,
+to avoid relying on `PATH`. Precedence is CLI > config > `ffprobe` on `PATH`.
+The value is one executable path, not a shell command or alias. Quote paths with
+spaces, use an absolute path for portability, and do not use `~` in TOML paths
+(TOML does not expand it). Missing/unusable executables warn and fall back to
+filename tags; an empty configured path is rejected. No automatic install or
+changes to your shell configuration are performed.
+
+## Subtitle reporting
+
+With `--subtitles`, subtitle inputs from wildcards or directory scans are reported
+separately from videos. Matching subtitles are considered with their video's
+rename; unmatched subtitles are left untouched with an explanatory warning.
+Matching requires the same directory and the video's complete original filename
+stem, optionally followed by suffixes such as `.en.forced` before `.srt`.
+These discovery messages do not mean a rename succeeded; the later apply results
+show what actually happened. Discovery messages do not change summary counts.
+
+For planned video/subtitle groups, `--log` records every member when a group is
+skipped or fails, as well as on success or dry runs. Subtitle records include the
+group's reason. A `failed` group status does not claim that each move was attempted
+or that every file was restored; the reason includes any reported rollback errors.
+Skipped and failed summary counts include the group's planned subtitles, just as
+successful rename counts already do. This does not add log entries for unmatched
+subtitles or subtitles whose video never reached the rename-planning stage.
 
 ## Ambiguous episode numbers
 
@@ -165,6 +206,11 @@ failures before metadata lookup, rather than treated as movies. Other files
 continue processing. If you mean episodes 3 through 4, use `S01E03-E04` or
 `S01E03E04`. Three-digit episode numbers such as `S01E123` remain supported.
 The same validation is available without TMDb access using `--parse-only`.
+Ranges must have two increasing endpoints in the same season and cover at most
+10 episodes. Reversed/equal endpoints, three-or-more episode markers, multiple
+season markers, and unsupported shorthand such as `S01E03-04` are rejected rather
+than truncated to a single episode. `1x03` and `Season 1 Episode 3` remain supported
+for single episodes; use `S01E03-E04` for ranges.
 
 ## Temporary TMDb failures
 
@@ -179,13 +225,26 @@ resolved rename plans can still be applied. Deferred files are reported as faile
 cargo test
 ```
 
-Covers filename parsing (movie/episode patterns, year extraction, junk
-stripping) and template rendering/sanitization.
+Covers parsing, templates, probing, quality comparisons, configuration, logs,
+subtitle grouping, no-overwrite moves, and rollback. Workflow tests run the actual
+scan/plan/apply/log pipeline against temporary files with deterministic metadata
+responses: no real API key or TMDb requests are needed. They check cross-container
+duplicates, configured probes, conflicts, failed moves, continued processing,
+dry runs, and existing-log protection. CLI process tests check exit codes and
+continued parsing after invalid filenames. Unix-only tests cover executable probes.
+
+Additional checks:
+
+```sh
+cargo fmt --check
+cargo clippy --offline --all-targets -- -D warnings
+cargo test --offline
+cargo build --release --offline
+```
 
 ## What's not implemented
 
 Compared to `mnamer`/RenameMyTVSeries this is intentionally lean:
 - Only TMDb is supported (no TVDb/OMDb fallback providers).
-- No subtitle-file handling (renaming `.srt` alongside video files).
 - No fuzzy "did you mean" correction beyond what TMDb's own search returns.
 These would be reasonable next additions if you want them.

@@ -24,6 +24,17 @@ static SEASON_EPISODE: Lazy<Regex> = Lazy::new(|| {
 // Check before parsing so a valid prefix cannot hide an invalid second episode.
 static AMBIGUOUS_EPISODE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\bS\d{1,2}[\s._-]?E(?:\d+[\s._-]?E)*\d{4,}\b").unwrap());
+static EPISODE_SEQUENCE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\bS([0-9]+)[\s._-]?E([0-9]+)((?:[\s._-]?E[0-9]+)*)\b").unwrap());
+static SEQUENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)E([0-9]+)").unwrap());
+static X_SEQUENCE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\b([0-9]+)x([0-9]+)((?:x[0-9]+)*)\b").unwrap());
+static WORD_SEQUENCE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\bseason[\s._-]*([0-9]+)[\s._-]+episode[\s._-]*([0-9]+)\b").unwrap()
+});
+static UNSUPPORTED_CONTINUATION: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)^[\s._]*(?:[-+&,][\s._]*(?:E(?:pisode)?[\s._]*)?[0-9]|E[0-9]|Episode[\s._]*[0-9]|x[0-9])").unwrap()
+});
 // 1x02, 12x345
 static SEASON_EPISODE_X: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\b(\d{1,2})x(\d{1,3})\b").unwrap());
@@ -55,7 +66,7 @@ static JUNK_TAGS: Lazy<Regex> = Lazy::new(|| {
 /// Replace common filename separators (dots, underscores, extra dashes) with spaces
 /// so parsing/regexes work on "words" rather than raw scene-style tokens.
 fn normalize_separators(stem: &str) -> String {
-    let mut s = stem.replace('_', " ").replace('.', " ");
+    let mut s = stem.replace(['_', '.'], " ");
     // collapse runs of dashes used as separators (but keep single hyphenated words alone;
     // we don't try to be perfect here, this is a best-effort heuristic like mnamer's)
     s = s.replace(" - ", " ");
@@ -107,7 +118,61 @@ pub fn parse_filename(stem: &str) -> anyhow::Result<Guess> {
             marker.as_str()
         );
     }
+    validate_episode_sequence(&normalized)?;
     Ok(parse_guess(stem))
+}
+
+fn validate_episode_sequence(normalized: &str) -> anyhow::Result<()> {
+    let markers: Vec<_> = EPISODE_SEQUENCE.captures_iter(normalized).collect();
+    let x_markers: Vec<_> = X_SEQUENCE.captures_iter(normalized).collect();
+    let word_markers: Vec<_> = WORD_SEQUENCE.captures_iter(normalized).collect();
+    if markers.len() + x_markers.len() + word_markers.len() > 1 {
+        anyhow::bail!("multiple season/episode markers are unsupported; use one same-season range such as S01E03-E04; file left unchanged");
+    }
+    if let Some(caps) = markers.first() {
+        let season = caps[1].parse::<u32>().ok().filter(|_| caps[1].len() <= 2);
+        let start = caps[2].parse::<u32>().ok().filter(|_| caps[2].len() <= 3);
+        let ends: Vec<_> = SEQUENCE_END.captures_iter(&caps[3]).collect();
+        if season.is_none() || start.is_none() || ends.len() > 1 {
+            anyhow::bail!("unsupported episode sequence '{}'; use a single episode or two explicit endpoints such as S01E03-E04; file left unchanged", &caps[0]);
+        }
+        if let Some(end) = ends.first() {
+            let end: u32 = end[1]
+                .parse()
+                .map_err(|_| anyhow::anyhow!("invalid episode range endpoint"))?;
+            let start = start.unwrap();
+            if end <= start {
+                anyhow::bail!(
+                    "episode range must end after it starts ('{}'); file left unchanged",
+                    &caps[0]
+                );
+            }
+            if end - start >= 10 {
+                anyhow::bail!(
+                    "episode range '{}' exceeds the 10-episode safety limit; file left unchanged",
+                    &caps[0]
+                );
+            }
+        }
+        reject_continuation(&normalized[caps.get(0).unwrap().end()..])?;
+    }
+    for caps in x_markers.iter().chain(word_markers.iter()) {
+        if caps[1].len() > 2
+            || caps[2].len() > 3
+            || caps.get(3).is_some_and(|tail| !tail.as_str().is_empty())
+        {
+            anyhow::bail!("unsupported episode sequence '{}'; use a single episode or S01E03-E04 for a range; file left unchanged", &caps[0]);
+        }
+        reject_continuation(&normalized[caps.get(0).unwrap().end()..])?;
+    }
+    Ok(())
+}
+
+fn reject_continuation(tail: &str) -> anyhow::Result<()> {
+    if UNSUPPORTED_CONTINUATION.is_match(tail) {
+        anyhow::bail!("unsupported episode sequence; use explicit endpoints such as S01E03-E04; file left unchanged");
+    }
+    Ok(())
 }
 
 fn parse_guess(stem: &str) -> Guess {
@@ -197,6 +262,47 @@ fn build_episode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_reversed_repeated_and_unsupported_ranges() {
+        for name in [
+            "Show.S01E04-E03",
+            "Show.S01E03E03",
+            "Show.S01E01E02E03",
+            "Show.S01E01-E02-E03",
+            "Show.S01E03-04",
+            "Show.S01E03+E04",
+            "Show.S01E03-S02E04",
+            "Show.S01E01-E11",
+            "Show.1x03-04",
+            "Show.Season.1.Episode.3-Episode.4",
+            "Show.S123E01",
+            "Show.1x03x04",
+            "Show.1x03.1x04",
+            "Show.1x0304",
+            "Show.S01E03.1x04",
+            "Show.Season.1.Episode.0304",
+        ] {
+            assert!(parse_filename(name).is_err(), "accepted {name}");
+        }
+    }
+
+    #[test]
+    fn accepts_safe_ranges_specials_and_normal_titles() {
+        for name in [
+            "Show.S01E01-E10",
+            "Show.S00E01",
+            "Show.S01E123-E124",
+            "Show.S01E03.The.4th.Day",
+            "Show.1x03.Pilot",
+            "Show.Season.1.Episode.3.Pilot",
+        ] {
+            assert!(matches!(
+                parse_filename(name).unwrap(),
+                Guess::Episode { .. }
+            ));
+        }
+    }
 
     #[test]
     fn parses_movie_with_year() {

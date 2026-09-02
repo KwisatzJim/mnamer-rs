@@ -114,6 +114,10 @@ pub struct Args {
     #[arg(long)]
     pub subtitles: bool,
 
+    /// ffprobe executable path (overrides config ffprobe_path; default: ffprobe on PATH)
+    #[arg(long, value_name = "PATH")]
+    pub ffprobe: Option<PathBuf>,
+
     /// Only touch files with these extensions (comma separated, no dots).
     /// [default: mkv,mp4,avi,mov,wmv,m4v,flv,webm,ts, overridable in config.toml]
     #[arg(long, value_delimiter = ',')]

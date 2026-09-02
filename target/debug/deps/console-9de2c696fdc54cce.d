@@ -1,0 +1,11 @@
+/Users/jimkelley/programming_projects/mnamer-rs/target/debug/deps/console-9de2c696fdc54cce.d: /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/lib.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/common_term.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/kb.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/term.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/unix_term.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/utils.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/ansi.rs
+
+/Users/jimkelley/programming_projects/mnamer-rs/target/debug/deps/libconsole-9de2c696fdc54cce.rmeta: /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/lib.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/common_term.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/kb.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/term.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/unix_term.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/utils.rs /Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/ansi.rs
+
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/lib.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/common_term.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/kb.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/term.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/unix_term.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/utils.rs:
+/Users/jimkelley/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.15.8/src/ansi.rs:

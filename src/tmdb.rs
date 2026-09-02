@@ -20,6 +20,26 @@ pub struct TmdbClient {
     lookups_deferred: Cell<bool>,
 }
 
+/// Metadata boundary: workflow tests can supply deterministic responses without
+/// sending requests or depending on a real API key.
+pub(crate) trait MetadataProvider {
+    fn search_movie(&self, title: &str, year: Option<u32>) -> Result<Vec<MovieMatch>>;
+    fn search_series(&self, name: &str) -> Result<Vec<SeriesMatch>>;
+    fn episode_title(&self, series_id: u64, season: u32, episode: u32) -> Result<Option<String>>;
+}
+
+impl MetadataProvider for TmdbClient {
+    fn search_movie(&self, title: &str, year: Option<u32>) -> Result<Vec<MovieMatch>> {
+        TmdbClient::search_movie(self, title, year)
+    }
+    fn search_series(&self, name: &str) -> Result<Vec<SeriesMatch>> {
+        TmdbClient::search_series(self, name)
+    }
+    fn episode_title(&self, series_id: u64, season: u32, episode: u32) -> Result<Option<String>> {
+        TmdbClient::episode_title(self, series_id, season, episode)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MovieMatch {
     pub title: String,
