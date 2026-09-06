@@ -10,12 +10,20 @@ The.Matrix.1999.1080p.BluRay.x264-GROUP.mkv   ->  The Matrix (1999).mkv
 Breaking.Bad.S05E14.Ozymandias.720p.WEB-DL.mp4 -> Breaking Bad - S05E14 - Ozymandias.mp4
 the.office.3x05.business.school.avi           -> The Office - S03E05 - Business School.avi
 ```
-<img width="1242" height="659" alt="Screenshot 2026-08-02 at 7 29 37 AM" src="https://github.com/user-attachments/assets/72c5d0a4-949b-4b03-80f9-80dce68e4b0c" />
 
-<img width="1242" height="659" alt="Screenshot 2026-08-02 at 7 29 44 AM" src="https://github.com/user-attachments/assets/a33bb2eb-ebbc-400a-bb2c-5748036b37a0" />
+<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 01 PM" src="https://github.com/user-attachments/assets/f4f5aa2e-4924-4763-8a34-e9520fca6358" />
 
-<img width="1242" height="659" alt="Screenshot 2026-08-02 at 7 30 03 AM" src="https://github.com/user-attachments/assets/0632e9fe-03ed-448f-87f6-e45b4b229abe" />
+<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 09 PM" src="https://github.com/user-attachments/assets/73651a94-ab39-490c-96a6-c8372071ab16" />
 
+<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 16 PM" src="https://github.com/user-attachments/assets/9cff9f78-2b90-40e0-82d1-6e01a758d6d5" />
+
+<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 23 PM" src="https://github.com/user-attachments/assets/71b78f3d-a181-4fa1-987c-6053bcc48269" />
+
+<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 33 PM" src="https://github.com/user-attachments/assets/5e2ca8a0-ddd6-45cd-9f0c-efed6df73f26" />
+
+<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 39 PM" src="https://github.com/user-attachments/assets/113695f3-63df-4269-95a4-e2d19aa83211" />
+
+<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 48 PM" src="https://github.com/user-attachments/assets/6dcc5e2d-d8f6-4ad1-b143-18d41c9e4e04" />
 
 ## Building
 
