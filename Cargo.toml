@@ -1,9 +1,14 @@
 [package]
 name = "mnamer-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+rust-version = "1.75"
 description = "A terminal media file renamer, inspired by mnamer and RenameMyTVSeries."
 license = "MIT"
+repository = "https://github.com/KwisatzJim/mnamer-rs"
+readme = "README.md"
+keywords = ["media", "rename", "movies", "television", "tmdb"]
+categories = ["command-line-utilities", "filesystem"]
 
 [[bin]]
 name = "mnamer-rs"
@@ -34,3 +39,4 @@ toml_edit = "=0.22.6"
 [profile.release]
 lto = true
 strip = true
+codegen-units = 1

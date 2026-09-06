@@ -25,6 +25,13 @@ cargo build --release
 
 The binary is at `target/release/mnamer-rs`.
 
+The release workflow is prepared to build archives for Linux x86-64 and macOS
+ARM64. See
+[Linux release and verification](docs/LINUX_RELEASE.md) for checksum, install,
+and hands-on test instructions. Version 0.2.0 remains unreleased until its
+source and CI results have been reviewed and the release tag is explicitly
+approved.
+
 > Note: this repo pins several transitive dependencies (`indexmap`, `url`,
 > `tempfile`, `toml_edit`, `getrandom`, `zeroize`) to slightly older versions.
 > That's only needed because this was built/tested against Rust 1.75; if
