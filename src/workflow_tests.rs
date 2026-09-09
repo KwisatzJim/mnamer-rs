@@ -1,7 +1,7 @@
 //! Full scan -> parse -> metadata -> plan -> apply -> log tests. Only metadata
 //! is substituted; files and move operations are real, isolated temporary files.
 use crate::cli::Args;
-use crate::tmdb::{MetadataProvider, MovieMatch, SeriesMatch};
+use crate::tmdb::{MetadataProvider, MovieMatch, SeasonEpisode, SeriesMatch};
 use crate::workflow::run_with_client;
 use anyhow::Result;
 use clap::Parser as _;
@@ -10,6 +10,7 @@ use std::path::PathBuf;
 struct Metadata {
     remove_before_beta: Option<PathBuf>,
     fail_alpha: bool,
+    incomplete_season: bool,
 }
 
 impl MetadataProvider for Metadata {
@@ -34,8 +35,18 @@ impl MetadataProvider for Metadata {
             first_air_year: Some(2026),
         }])
     }
-    fn episode_title(&self, _: u64, _: u32, episode: u32) -> Result<Option<String>> {
-        Ok(Some(format!("Episode {episode}")))
+    fn season_episodes(&self, _: u64, _: u32) -> Result<Vec<SeasonEpisode>> {
+        Ok((1..=10)
+            .map(|episode_number| SeasonEpisode {
+                episode_number,
+                name: if self.incomplete_season && episode_number == 4 {
+                    "Episode 4".into()
+                } else {
+                    format!("Title {episode_number}")
+                },
+                air_date: "2020-01-01".into(),
+            })
+            .collect())
     }
 }
 
@@ -57,11 +68,36 @@ fn invalid_episode_range_is_logged_before_lookup_and_valid_episode_continues() {
         b"bad range"
     );
     assert_eq!(
-        std::fs::read(f.path("Show - S01E05 - Episode 5.mkv")).unwrap(),
+        std::fs::read(f.path("Show - S01E05 - Title 5.mkv")).unwrap(),
         b"good episode"
     );
     assert_eq!(f.records()[0]["status"], "failed");
     assert_eq!(f.records()[1]["status"], "renamed");
+}
+
+#[test]
+fn incomplete_season_metadata_leaves_episode_unchanged() {
+    let f = Fixture::new();
+    f.write("Show.S01E05.mkv", b"episode");
+    let error = run_with_client(f.args(&[], &["Show.S01E05.mkv"]), |_| {
+        Ok(Metadata {
+            remove_before_beta: None,
+            fail_alpha: false,
+            incomplete_season: true,
+        })
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("1 file failed"));
+    assert_eq!(
+        std::fs::read(f.path("Show.S01E05.mkv")).unwrap(),
+        b"episode"
+    );
+    let records = f.records();
+    assert_eq!(records[0]["status"], "failed");
+    assert!(records[0]["reason"]
+        .as_str()
+        .unwrap()
+        .contains("episode 4 still has a placeholder title"));
 }
 impl Fixture {
     fn new() -> Self {
@@ -98,6 +134,7 @@ impl Fixture {
             Ok(Metadata {
                 remove_before_beta: None,
                 fail_alpha: false,
+                incomplete_season: false,
             })
         })
     }
@@ -183,6 +220,7 @@ fn failed_moves_and_rollback_are_logged_and_do_not_stop_other_groups() {
             Ok(Metadata {
                 remove_before_beta: Some(f.path(remove)),
                 fail_alpha: false,
+                incomplete_season: false,
             })
         })
         .unwrap_err();
@@ -215,6 +253,7 @@ fn metadata_failure_does_not_block_later_files() {
             Ok(Metadata {
                 remove_before_beta: None,
                 fail_alpha: true,
+                incomplete_season: false,
             })
         })
         .is_err()

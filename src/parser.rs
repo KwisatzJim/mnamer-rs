@@ -35,6 +35,8 @@ static WORD_SEQUENCE: Lazy<Regex> = Lazy::new(|| {
 static UNSUPPORTED_CONTINUATION: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)^[\s._]*(?:[-+&,][\s._]*(?:E(?:pisode)?[\s._]*)?[0-9]|E[0-9]|Episode[\s._]*[0-9]|x[0-9])").unwrap()
 });
+static GENERATED_PLACEHOLDER_TITLE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)^[\s._-]*Episode[\s._-]*(\d{1,3})$").unwrap());
 // 1x02, 12x345
 static SEASON_EPISODE_X: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\b(\d{1,2})x(\d{1,3})\b").unwrap());
@@ -154,7 +156,7 @@ fn validate_episode_sequence(normalized: &str) -> anyhow::Result<()> {
                 );
             }
         }
-        reject_continuation(&normalized[caps.get(0).unwrap().end()..])?;
+        reject_continuation(&normalized[caps.get(0).unwrap().end()..], start.unwrap())?;
     }
     for caps in x_markers.iter().chain(word_markers.iter()) {
         if caps[1].len() > 2
@@ -163,12 +165,25 @@ fn validate_episode_sequence(normalized: &str) -> anyhow::Result<()> {
         {
             anyhow::bail!("unsupported episode sequence '{}'; use a single episode or S01E03-E04 for a range; file left unchanged", &caps[0]);
         }
-        reject_continuation(&normalized[caps.get(0).unwrap().end()..])?;
+        let episode = caps[2]
+            .parse::<u32>()
+            .map_err(|_| anyhow::anyhow!("invalid episode number"))?;
+        reject_continuation(&normalized[caps.get(0).unwrap().end()..], episode)?;
     }
     Ok(())
 }
 
-fn reject_continuation(tail: &str) -> anyhow::Result<()> {
+fn reject_continuation(tail: &str, episode: u32) -> anyhow::Result<()> {
+    // TMDb sometimes supplies a temporary title such as "Episode 4". That
+    // produces a valid filename like "Show - S02E04 - Episode 4", which must
+    // remain parseable so it can be corrected after TMDb updates its metadata.
+    if GENERATED_PLACEHOLDER_TITLE
+        .captures(tail)
+        .and_then(|caps| caps[1].parse::<u32>().ok())
+        == Some(episode)
+    {
+        return Ok(());
+    }
     if UNSUPPORTED_CONTINUATION.is_match(tail) {
         anyhow::bail!("unsupported episode sequence; use explicit endpoints such as S01E03-E04; file left unchanged");
     }
@@ -410,5 +425,27 @@ mod tests {
                 Guess::Episode { .. }
             ));
         }
+    }
+
+    #[test]
+    fn accepts_generated_placeholder_episode_title() {
+        assert_eq!(
+            parse_filename("The Paper - s02e04 - Episode 4").unwrap(),
+            Guess::Episode {
+                series: "The Paper".to_string(),
+                season: 2,
+                episode: 4,
+                episode_end: None,
+                year: None,
+            }
+        );
+    }
+
+    #[test]
+    fn still_rejects_a_different_episode_as_an_implicit_continuation() {
+        let error = parse_filename("Show.S01E03.Episode.4")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("unsupported episode sequence"));
     }
 }

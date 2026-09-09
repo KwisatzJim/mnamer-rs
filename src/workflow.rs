@@ -5,7 +5,7 @@ use crate::parser::Guess;
 use crate::quality::{count_destinations, duplicate_destination_key, select_preferred_sources};
 use crate::report::RunLog;
 use crate::scanning::{collect_files, find_subtitle_plans};
-use crate::tmdb::{MetadataProvider, MovieMatch, SeriesMatch, TmdbClient};
+use crate::tmdb::{MetadataProvider, MovieMatch, SeasonEpisode, SeriesMatch, TmdbClient};
 use crate::{config, parser, rename};
 use anyhow::{Context, Result};
 use console::style;
@@ -14,6 +14,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 static TEMPLATE_FIELD: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{([^{}]+)\}").unwrap());
 
@@ -624,15 +625,86 @@ pub(crate) fn resolve_episode(
             "multi-episode range E{episode:02}-E{final_episode:02} exceeds the 10-episode safety limit"
         );
     }
+    let season_episodes = client
+        .season_episodes(chosen.id, season)
+        .context("season lookup failed")?;
+    if let Some(reason) = season_metadata_issue(&season_episodes, &current_utc_date()) {
+        anyhow::bail!(
+            "TMDb season metadata is not ready ({reason}); file left unchanged. Try again after TMDb updates the season"
+        );
+    }
+
     let mut titles = Vec::new();
     for episode_number in episode..=final_episode {
-        let title = client
-            .episode_title(chosen.id, season, episode_number)
-            .with_context(|| format!("episode {episode_number} lookup failed"))?
-            .unwrap_or_else(|| format!("Episode {episode_number}"));
+        let title = season_episodes
+            .iter()
+            .find(|candidate| candidate.episode_number == episode_number)
+            .map(|candidate| candidate.name.clone())
+            .with_context(|| {
+                format!(
+                    "TMDb season does not contain episode {episode_number}; file left unchanged"
+                )
+            })?;
         titles.push(title);
     }
     Ok(Some((chosen, titles.join(" + "))))
+}
+
+fn season_metadata_issue(episodes: &[SeasonEpisode], today: &str) -> Option<String> {
+    if episodes.is_empty() {
+        return Some("the season has no episodes".into());
+    }
+    let mut first_air_date: Option<&str> = None;
+    for episode in episodes {
+        let name = episode.name.trim();
+        let placeholder = format!("episode {}", episode.episode_number);
+        if name.is_empty() || name.eq_ignore_ascii_case(&placeholder) {
+            return Some(format!(
+                "episode {} still has a placeholder title",
+                episode.episode_number
+            ));
+        }
+        if episode.air_date.is_empty() {
+            return Some(format!(
+                "episode {} has no air date",
+                episode.episode_number
+            ));
+        }
+        first_air_date = Some(
+            first_air_date
+                .map(|date| date.min(episode.air_date.as_str()))
+                .unwrap_or(&episode.air_date),
+        );
+    }
+    if let Some(first_air_date) = first_air_date.filter(|date| *date > today) {
+        return Some(format!("the season does not air until {first_air_date}"));
+    }
+    None
+}
+
+fn current_utc_date() -> String {
+    let days = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        / 86_400;
+    let (year, month, day) = civil_date_from_unix_days(days as i64);
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
+fn civil_date_from_unix_days(days: i64) -> (i64, i64, i64) {
+    let days = days + 719_468;
+    let era = if days >= 0 { days } else { days - 146_096 } / 146_097;
+    let day_of_era = days - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    year += i64::from(month <= 2);
+    (year, month, day)
 }
 
 pub(crate) fn resolve_api_key(args: &Args, cfg: &config::FileConfig) -> Result<String> {
@@ -657,4 +729,45 @@ pub(crate) fn resolve_api_key(args: &Args, cfg: &config::FileConfig) -> Result<S
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "config.toml".to_string())
     );
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::{civil_date_from_unix_days, season_metadata_issue};
+    use crate::tmdb::SeasonEpisode;
+
+    fn episode(number: u32, name: &str, air_date: &str) -> SeasonEpisode {
+        SeasonEpisode {
+            episode_number: number,
+            name: name.into(),
+            air_date: air_date.into(),
+        }
+    }
+
+    #[test]
+    fn incomplete_season_reports_placeholder_title() {
+        let episodes = [
+            episode(1, "Real Title", "2026-09-09"),
+            episode(2, "Episode 2", "2026-09-09"),
+        ];
+        assert_eq!(
+            season_metadata_issue(&episodes, "2026-09-09").as_deref(),
+            Some("episode 2 still has a placeholder title")
+        );
+    }
+
+    #[test]
+    fn season_premiere_must_not_be_in_the_future() {
+        let episodes = [episode(1, "Real Title", "2026-09-10")];
+        assert_eq!(
+            season_metadata_issue(&episodes, "2026-09-09").as_deref(),
+            Some("the season does not air until 2026-09-10")
+        );
+    }
+
+    #[test]
+    fn unix_day_conversion_matches_known_dates() {
+        assert_eq!(civil_date_from_unix_days(0), (1970, 1, 1));
+        assert_eq!(civil_date_from_unix_days(20_705), (2026, 9, 9));
+    }
 }

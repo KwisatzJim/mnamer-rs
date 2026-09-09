@@ -25,7 +25,7 @@ pub struct TmdbClient {
 pub(crate) trait MetadataProvider {
     fn search_movie(&self, title: &str, year: Option<u32>) -> Result<Vec<MovieMatch>>;
     fn search_series(&self, name: &str) -> Result<Vec<SeriesMatch>>;
-    fn episode_title(&self, series_id: u64, season: u32, episode: u32) -> Result<Option<String>>;
+    fn season_episodes(&self, series_id: u64, season: u32) -> Result<Vec<SeasonEpisode>>;
 }
 
 impl MetadataProvider for TmdbClient {
@@ -35,8 +35,8 @@ impl MetadataProvider for TmdbClient {
     fn search_series(&self, name: &str) -> Result<Vec<SeriesMatch>> {
         TmdbClient::search_series(self, name)
     }
-    fn episode_title(&self, series_id: u64, season: u32, episode: u32) -> Result<Option<String>> {
-        TmdbClient::episode_title(self, series_id, season, episode)
+    fn season_episodes(&self, series_id: u64, season: u32) -> Result<Vec<SeasonEpisode>> {
+        TmdbClient::season_episodes(self, series_id, season)
     }
 }
 
@@ -51,6 +51,13 @@ pub struct SeriesMatch {
     pub id: u64,
     pub name: String,
     pub first_air_year: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SeasonEpisode {
+    pub episode_number: u32,
+    pub name: String,
+    pub air_date: String,
 }
 
 #[derive(Deserialize)]
@@ -75,7 +82,15 @@ struct RawSeries {
 
 #[derive(Deserialize)]
 struct RawEpisode {
+    episode_number: u32,
     name: String,
+    #[serde(default)]
+    air_date: String,
+}
+
+#[derive(Deserialize)]
+struct RawSeason {
+    episodes: Vec<RawEpisode>,
 }
 
 impl TmdbClient {
@@ -142,28 +157,32 @@ impl TmdbClient {
             .collect())
     }
 
-    /// Returns the episode title, if TMDb has one on file.
-    pub fn episode_title(
-        &self,
-        series_id: u64,
-        season: u32,
-        episode: u32,
-    ) -> Result<Option<String>> {
-        let url = format!("{BASE_URL}/tv/{series_id}/season/{season}/episode/{episode}");
+    /// Returns the whole season so callers can reject incomplete metadata
+    /// rather than trusting a mixture of real and placeholder episode names.
+    pub fn season_episodes(&self, series_id: u64, season: u32) -> Result<Vec<SeasonEpisode>> {
+        let url = format!("{BASE_URL}/tv/{series_id}/season/{season}");
         let req = self
             .http
             .get(url)
             .query(&[("api_key", self.api_key.as_str())]);
         let resp = self.send_with_retry(req)?;
         if resp.status() == reqwest::StatusCode::NOT_FOUND {
-            return Ok(None);
+            return Ok(Vec::new());
         }
         Self::check_status(&resp)?;
-        let parsed: RawEpisode = resp
+        let parsed: RawSeason = resp
             .json()
             .map_err(redact_request_url)
-            .context("failed to parse TMDb episode response")?;
-        Ok(Some(parsed.name))
+            .context("failed to parse TMDb season response")?;
+        Ok(parsed
+            .episodes
+            .into_iter()
+            .map(|episode| SeasonEpisode {
+                episode_number: episode.episode_number,
+                name: episode.name,
+                air_date: episode.air_date,
+            })
+            .collect())
     }
 
     fn check_status(resp: &reqwest::blocking::Response) -> Result<()> {
