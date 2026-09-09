@@ -46,6 +46,12 @@ approved.
 > you're on a current stable toolchain you can safely remove those pins from
 > `Cargo.toml` and `cargo update`.
 
+## Install from GitHub
+
+```
+cargo install --git https://github.com/KwisatzJim/mnamer-rs
+```
+
 ## API key
 
 You need a free TMDb API key: https://www.themoviedb.org/settings/api
