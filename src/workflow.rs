@@ -628,9 +628,23 @@ pub(crate) fn resolve_episode(
     let season_episodes = client
         .season_episodes(chosen.id, season)
         .context("season lookup failed")?;
-    if let Some(reason) = season_metadata_issue(&season_episodes, &current_utc_date()) {
+    let today = current_utc_date();
+    if let Some(reason) =
+        requested_episode_metadata_issue(&season_episodes, episode, final_episode, &today)
+    {
         anyhow::bail!(
-            "TMDb season metadata is not ready ({reason}); file left unchanged. Try again after TMDb updates the season"
+            "TMDb episode metadata is not ready ({reason}); file left unchanged. Try again after TMDb updates the episode"
+        );
+    }
+    if let Some(reason) = season_metadata_issue(&season_episodes, &today) {
+        if batch {
+            anyhow::bail!(
+                "TMDb season metadata is not ready ({reason}); batch mode left the file unchanged. Try an interactive run to review the requested episode"
+            );
+        }
+        println!(
+            "{} other episodes in this season have incomplete metadata ({reason}); carefully review the requested title",
+            style("  warning:").yellow().bold()
         );
     }
 
@@ -650,25 +664,58 @@ pub(crate) fn resolve_episode(
     Ok(Some((chosen, titles.join(" + "))))
 }
 
+fn requested_episode_metadata_issue(
+    episodes: &[SeasonEpisode],
+    first_episode: u32,
+    final_episode: u32,
+    today: &str,
+) -> Option<String> {
+    for episode_number in first_episode..=final_episode {
+        let Some(episode) = episodes
+            .iter()
+            .find(|candidate| candidate.episode_number == episode_number)
+        else {
+            return Some(format!("episode {episode_number} is missing"));
+        };
+        if let Some(reason) = episode_metadata_issue(episode) {
+            return Some(reason);
+        }
+        if episode.air_date.as_str() > today {
+            return Some(format!(
+                "episode {} does not air until {}",
+                episode.episode_number, episode.air_date
+            ));
+        }
+    }
+    None
+}
+
+fn episode_metadata_issue(episode: &SeasonEpisode) -> Option<String> {
+    let name = episode.name.trim();
+    let placeholder = format!("episode {}", episode.episode_number);
+    if name.is_empty() || name.eq_ignore_ascii_case(&placeholder) {
+        return Some(format!(
+            "episode {} still has a placeholder title",
+            episode.episode_number
+        ));
+    }
+    if episode.air_date.is_empty() {
+        return Some(format!(
+            "episode {} has no air date",
+            episode.episode_number
+        ));
+    }
+    None
+}
+
 fn season_metadata_issue(episodes: &[SeasonEpisode], today: &str) -> Option<String> {
     if episodes.is_empty() {
         return Some("the season has no episodes".into());
     }
     let mut first_air_date: Option<&str> = None;
     for episode in episodes {
-        let name = episode.name.trim();
-        let placeholder = format!("episode {}", episode.episode_number);
-        if name.is_empty() || name.eq_ignore_ascii_case(&placeholder) {
-            return Some(format!(
-                "episode {} still has a placeholder title",
-                episode.episode_number
-            ));
-        }
-        if episode.air_date.is_empty() {
-            return Some(format!(
-                "episode {} has no air date",
-                episode.episode_number
-            ));
+        if let Some(reason) = episode_metadata_issue(episode) {
+            return Some(reason);
         }
         first_air_date = Some(
             first_air_date
@@ -733,7 +780,9 @@ pub(crate) fn resolve_api_key(args: &Args, cfg: &config::FileConfig) -> Result<S
 
 #[cfg(test)]
 mod metadata_tests {
-    use super::{civil_date_from_unix_days, season_metadata_issue};
+    use super::{
+        civil_date_from_unix_days, requested_episode_metadata_issue, season_metadata_issue,
+    };
     use crate::tmdb::SeasonEpisode;
 
     fn episode(number: u32, name: &str, air_date: &str) -> SeasonEpisode {
@@ -753,6 +802,37 @@ mod metadata_tests {
         assert_eq!(
             season_metadata_issue(&episodes, "2026-09-09").as_deref(),
             Some("episode 2 still has a placeholder title")
+        );
+    }
+
+    #[test]
+    fn unrelated_placeholder_does_not_invalidate_requested_episode() {
+        let episodes = [
+            episode(8, "The Requested Title", "2026-09-09"),
+            episode(9, "Episode 9", "2026-09-16"),
+        ];
+        assert_eq!(
+            requested_episode_metadata_issue(&episodes, 8, 8, "2026-09-09"),
+            None
+        );
+        assert_eq!(
+            season_metadata_issue(&episodes, "2026-09-09").as_deref(),
+            Some("episode 9 still has a placeholder title")
+        );
+    }
+
+    #[test]
+    fn requested_placeholder_or_future_episode_is_rejected() {
+        let placeholder = [episode(2, "Episode 2", "2026-09-09")];
+        assert_eq!(
+            requested_episode_metadata_issue(&placeholder, 2, 2, "2026-09-09").as_deref(),
+            Some("episode 2 still has a placeholder title")
+        );
+
+        let future = [episode(2, "A Real Title", "2026-09-10")];
+        assert_eq!(
+            requested_episode_metadata_issue(&future, 2, 2, "2026-09-09").as_deref(),
+            Some("episode 2 does not air until 2026-09-10")
         );
     }
 
