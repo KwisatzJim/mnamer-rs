@@ -1,11 +1,12 @@
-use crate::cli::{self, Args, MediaType};
+use crate::cli::{self, Args, EpisodeApi, MediaType};
+use crate::metadata::MetadataClient;
 use crate::model::RenamePlan;
 use crate::operations::apply_rename_group;
 use crate::parser::Guess;
 use crate::quality::{count_destinations, duplicate_destination_key, select_preferred_sources};
 use crate::report::RunLog;
 use crate::scanning::{collect_files, find_subtitle_plans};
-use crate::tmdb::{MetadataProvider, MovieMatch, SeasonEpisode, SeriesMatch, TmdbClient};
+use crate::tmdb::{MetadataProvider, MovieMatch, SeasonEpisode, SeriesMatch};
 use crate::{config, parser, rename};
 use anyhow::{Context, Result};
 use console::style;
@@ -19,12 +20,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static TEMPLATE_FIELD: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{([^{}]+)\}").unwrap());
 
 pub(crate) fn run(args: Args) -> Result<()> {
-    run_with_client(args, TmdbClient::new)
+    run_with_client(args, MetadataClient::new)
 }
 
 pub(crate) fn run_with_client<C: MetadataProvider>(
     args: Args,
-    create_client: impl FnOnce(String) -> Result<C>,
+    create_client: impl FnOnce(String, EpisodeApi) -> Result<C>,
 ) -> Result<()> {
     let cfg = config::load(args.config.as_deref())?;
 
@@ -32,6 +33,7 @@ pub(crate) fn run_with_client<C: MetadataProvider>(
     let batch = resolve_bool(args.batch, args.no_batch, cfg.batch);
     let lower = resolve_bool(args.lower, args.no_lower, cfg.lower);
     let scene = resolve_bool(args.scene, args.no_scene, cfg.scene);
+    let episode_api = resolve_episode_api(args.episode_api, cfg.episode_api);
     let output_dir = args.output_dir.clone().or_else(|| cfg.output_dir.clone());
     let ffprobe = resolve_ffprobe_path(args.ffprobe.as_deref(), cfg.ffprobe_path.as_deref())?;
     let extensions = args
@@ -92,7 +94,7 @@ pub(crate) fn run_with_client<C: MetadataProvider>(
     }
 
     let api_key = resolve_api_key(&args, &cfg)?;
-    let client = create_client(api_key)?;
+    let client = create_client(api_key, episode_api)?;
     let mut log = RunLog::new(args.log.as_deref())?;
 
     let mut renamed = 0usize;
@@ -394,6 +396,13 @@ pub(crate) fn resolve_bool(enabled: bool, disabled: bool, configured: Option<boo
     }
 }
 
+pub(crate) fn resolve_episode_api(
+    cli: Option<EpisodeApi>,
+    configured: Option<EpisodeApi>,
+) -> EpisodeApi {
+    cli.or(configured).unwrap_or(EpisodeApi::Tmdb)
+}
+
 pub(crate) fn validate_template(template: &str, kind: &str, allowed: &[&str]) -> Result<()> {
     if template.trim().is_empty() {
         anyhow::bail!("{kind} filename template cannot be empty");
@@ -435,6 +444,13 @@ pub(crate) fn title_match_is_confident(query: &str, result: &str) -> bool {
     let intersection = query_tokens.intersection(&result_tokens).count();
     let union = query_tokens.union(&result_tokens).count();
     intersection * 100 >= union * 80
+}
+
+pub(crate) fn default_series_match_index(query: &str, matches: &[SeriesMatch]) -> usize {
+    matches
+        .iter()
+        .position(|candidate| title_match_is_confident(query, &candidate.name))
+        .unwrap_or(matches.len())
 }
 
 pub(crate) fn title_tokens(title: &str) -> HashSet<String> {
@@ -607,10 +623,11 @@ pub(crate) fn resolve_episode(
             })
             .chain(std::iter::once("Skip this file".to_string()))
             .collect();
+        let default = default_series_match_index(series, &matches);
         let idx = Select::with_theme(&ColorfulTheme::default())
             .with_prompt("  Select a series match")
             .items(&labels)
-            .default(0)
+            .default(default)
             .interact()
             .unwrap_or(labels.len() - 1);
         if idx >= matches.len() {
@@ -693,7 +710,11 @@ fn requested_episode_metadata_issue(
 fn episode_metadata_issue(episode: &SeasonEpisode) -> Option<String> {
     let name = episode.name.trim();
     let placeholder = format!("episode {}", episode.episode_number);
-    if name.is_empty() || name.eq_ignore_ascii_case(&placeholder) {
+    if name.is_empty()
+        || name.eq_ignore_ascii_case(&placeholder)
+        || name.eq_ignore_ascii_case("tba")
+        || name.eq_ignore_ascii_case("tbd")
+    {
         return Some(format!(
             "episode {} still has a placeholder title",
             episode.episode_number
@@ -826,6 +847,12 @@ mod metadata_tests {
         let placeholder = [episode(2, "Episode 2", "2026-09-09")];
         assert_eq!(
             requested_episode_metadata_issue(&placeholder, 2, 2, "2026-09-09").as_deref(),
+            Some("episode 2 still has a placeholder title")
+        );
+
+        let tba = [episode(2, "TBA", "2026-09-09")];
+        assert_eq!(
+            requested_episode_metadata_issue(&tba, 2, 2, "2026-09-09").as_deref(),
             Some("episode 2 still has a placeholder title")
         );
 

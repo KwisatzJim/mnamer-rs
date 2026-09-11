@@ -79,7 +79,7 @@ fn invalid_episode_range_is_logged_before_lookup_and_valid_episode_continues() {
 fn incomplete_season_metadata_leaves_episode_unchanged() {
     let f = Fixture::new();
     f.write("Show.S01E05.mkv", b"episode");
-    let error = run_with_client(f.args(&[], &["Show.S01E05.mkv"]), |_| {
+    let error = run_with_client(f.args(&[], &["Show.S01E05.mkv"]), |_, _| {
         Ok(Metadata {
             remove_before_beta: None,
             fail_alpha: false,
@@ -130,7 +130,7 @@ impl Fixture {
         Args::parse_from(args)
     }
     fn run(&self, flags: &[&str], names: &[&str]) -> Result<()> {
-        run_with_client(self.args(flags, names), |_| {
+        run_with_client(self.args(flags, names), |_, _| {
             Ok(Metadata {
                 remove_before_beta: None,
                 fail_alpha: false,
@@ -216,7 +216,7 @@ fn failed_moves_and_rollback_are_logged_and_do_not_stop_other_groups() {
         for name in ["Alpha.2026.mkv", "Alpha.2026.srt", "Beta.2026.mkv"] {
             f.write(name, name.as_bytes());
         }
-        let error = run_with_client(f.args(&[], &["Alpha.2026.mkv", "Beta.2026.mkv"]), |_| {
+        let error = run_with_client(f.args(&[], &["Alpha.2026.mkv", "Beta.2026.mkv"]), |_, _| {
             Ok(Metadata {
                 remove_before_beta: Some(f.path(remove)),
                 fail_alpha: false,
@@ -249,7 +249,7 @@ fn metadata_failure_does_not_block_later_files() {
     f.write("Alpha.2026.mkv", b"alpha");
     f.write("Beta.2026.mkv", b"beta");
     assert!(
-        run_with_client(f.args(&[], &["Alpha.2026.mkv", "Beta.2026.mkv"]), |_| {
+        run_with_client(f.args(&[], &["Alpha.2026.mkv", "Beta.2026.mkv"]), |_, _| {
             Ok(Metadata {
                 remove_before_beta: None,
                 fail_alpha: true,

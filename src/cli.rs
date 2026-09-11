@@ -1,4 +1,5 @@
 use clap::{Parser, ValueEnum};
+use serde::Deserialize;
 use std::path::PathBuf;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
@@ -6,6 +7,13 @@ pub enum MediaType {
     Movie,
     Episode,
     Auto,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EpisodeApi {
+    Tmdb,
+    Tvmaze,
 }
 
 /// Built-in fallback defaults, used only if neither the CLI flag nor the
@@ -68,6 +76,10 @@ pub struct Args {
     /// TMDb v3 API key. Falls back to $TMDB_API_KEY, then the config file.
     #[arg(long)]
     pub api_key: Option<String>,
+
+    /// Metadata provider for television episodes (default: tmdb)
+    #[arg(long, value_enum)]
+    pub episode_api: Option<EpisodeApi>,
 
     /// Movie filename template. Placeholders: {title} {year} {ext}
     /// [default: "{title} ({year}){ext}", overridable in config.toml]

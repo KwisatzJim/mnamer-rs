@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod metadata;
 mod model;
 mod operations;
 mod parser;
@@ -10,6 +11,7 @@ mod scanning;
 #[cfg(test)]
 mod tests;
 mod tmdb;
+mod tvmaze;
 mod workflow;
 #[cfg(test)]
 mod workflow_tests;

@@ -56,6 +56,9 @@ cargo install --git https://github.com/KwisatzJim/mnamer-rs
 
 You need a free TMDb API key: https://www.themoviedb.org/settings/api
 (the "API Read Access Token" page — grab the v3 "API Key", not the v4 token).
+TMDb is always used for movies and is the default television provider. TVmaze
+does not require its own key, but `mnamer-rs` still requires the TMDb key so
+movie lookup remains available during the same run.
 
 Provide it any of three ways:
 
@@ -78,6 +81,9 @@ All supported keys (all optional):
 
 ```toml
 api_key = "your_tmdb_api_key_here"
+
+# Television metadata provider: "tmdb" (default) or "tvmaze"
+episode_api = "tmdb"
 
 # Optional absolute path to ffprobe; otherwise it is found on PATH
 ffprobe_path = "/opt/homebrew/bin/ffprobe"
@@ -112,6 +118,9 @@ mnamer-rs --recursive ~/Downloads/media
 
 # See what it would do without touching anything
 mnamer-rs --dry-run --recursive ~/Downloads/media
+
+# Use TVmaze instead of TMDb for television series and episode titles
+mnamer-rs --episode-api tvmaze --dry-run ~/Downloads/episodes
 
 # Use ffprobe directly, without changing your shell PATH
 mnamer-rs --ffprobe /opt/homebrew/bin/ffprobe --dry-run --batch ~/Downloads/media
@@ -160,11 +169,15 @@ record is flushed immediately, though this is not a guarantee against power loss
    season/episode markers (`S01E02`, `1x02`, `Season 1 Episode 2`), pulls out
    a year, strips known junk tags (`1080p`, `x264`, `WEB-DL`, release-group
    names, ...), and title-cases the remainder.
-2. **Lookup** — `src/tmdb.rs` searches TMDb's `/search/movie` or `/search/tv`
-   endpoint, and for episodes also fetches the actual episode title from
-   `/tv/{id}/season/{n}/episode/{n}`.
+2. **Lookup** — movies always use TMDb. Television uses TMDb by default, or
+   TVmaze when `--episode-api tvmaze` (or `episode_api = "tvmaze"` in the
+   config) is selected. Episode lookup fetches the provider's season/episode
+   list so the requested titles and air dates can be validated before rename
+   planning.
 3. **Confirm** — unless `--batch` is passed, you get an interactive picker
    (via `dialoguer`) to choose among the returned matches, or skip the file.
+   If the provider returns only uncertain title matches, the picker defaults to
+   `Skip this file` rather than placing a likely-wrong show under the cursor.
 4. **Rename** — `src/rename.rs` renders your template, sanitizes illegal
    filename characters, and `src/operations.rs` performs the move (falling back to
    copy+delete if `--output-dir` is on a different filesystem).
@@ -233,12 +246,29 @@ season markers, and unsupported shorthand such as `S01E03-04` are rejected rathe
 than truncated to a single episode. `1x03` and `Season 1 Episode 3` remain supported
 for single episodes; use `S01E03-E04` for ranges.
 
-## Temporary TMDb failures
+## Temporary metadata provider failures
 
 TMDb requests retry temporary failures up to three times and honor `Retry-After`
 in seconds or HTTP-date form. Waits over 30 seconds, or exhausted rate-limit
 retries, defer subsequent lookups for the rest of the run; rerun later. Already
 resolved rename plans can still be applied. Deferred files are reported as failed.
+
+TVmaze requests also retry temporary server and rate-limit failures up to three
+times. Provider selection is explicit; `mnamer-rs` never silently substitutes
+TVmaze data for TMDb data or vice versa.
+
+## Incomplete episode metadata
+
+The requested episode must have a non-placeholder title and an air date that is
+not in the future. Interactive runs warn when unrelated episodes in the season
+still have incomplete metadata, but allow you to review the valid requested
+episode. Batch mode is intentionally stricter and leaves the file unchanged when
+any episode in the season still has incomplete metadata.
+
+## Metadata credits
+
+Optional television metadata from [TVmaze](https://www.tvmaze.com/) is used
+under the [CC BY-SA license](https://creativecommons.org/licenses/by-sa/4.0/).
 
 ## Tests
 

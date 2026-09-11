@@ -1,4 +1,4 @@
-use crate::cli::Args;
+use crate::cli::{Args, EpisodeApi};
 use crate::config;
 use crate::model::*;
 use crate::operations::*;
@@ -350,6 +350,26 @@ fn batch_confidence_rejects_weak_titles_and_year_mismatches() {
 }
 
 #[test]
+fn uncertain_interactive_series_results_default_to_skip() {
+    let wrong = vec![crate::tmdb::SeriesMatch {
+        id: 1,
+        name: "The Perfect Line".into(),
+        first_air_year: Some(2025),
+    }];
+    assert_eq!(default_series_match_index("The Perfect Lie", &wrong), 1);
+
+    let exact = vec![crate::tmdb::SeriesMatch {
+        id: 2,
+        name: "Stuart Fails to Save the Universe".into(),
+        first_air_year: Some(2026),
+    }];
+    assert_eq!(
+        default_series_match_index("Stuart Fails to Save the Universe", &exact),
+        0
+    );
+}
+
+#[test]
 fn does_not_choose_when_highest_resolution_is_tied() {
     let destination = PathBuf::from("Show - S01E01 - Pilot.mkv");
     let plans = vec![
@@ -609,6 +629,24 @@ fn command_line_boolean_overrides_config() {
     assert!(!resolve_bool(false, true, Some(true)));
     assert!(resolve_bool(false, false, Some(true)));
     assert!(!resolve_bool(false, false, None));
+}
+
+#[test]
+fn episode_provider_uses_cli_then_config_then_tmdb_default() {
+    assert_eq!(resolve_episode_api(None, None), EpisodeApi::Tmdb);
+    assert_eq!(
+        resolve_episode_api(None, Some(EpisodeApi::Tvmaze)),
+        EpisodeApi::Tvmaze
+    );
+    assert_eq!(
+        resolve_episode_api(Some(EpisodeApi::Tmdb), Some(EpisodeApi::Tvmaze)),
+        EpisodeApi::Tmdb
+    );
+
+    let args = Args::parse_from(["mnamer-rs", "--episode-api", "tvmaze", "show.mkv"]);
+    assert_eq!(args.episode_api, Some(EpisodeApi::Tvmaze));
+    let config: config::FileConfig = toml::from_str("episode_api = 'tvmaze'").unwrap();
+    assert_eq!(config.episode_api, Some(EpisodeApi::Tvmaze));
 }
 
 #[test]

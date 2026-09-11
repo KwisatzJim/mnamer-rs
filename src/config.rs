@@ -1,3 +1,4 @@
+use crate::cli::EpisodeApi;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::io::ErrorKind;
@@ -6,6 +7,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Default, Deserialize)]
 pub struct FileConfig {
     pub api_key: Option<String>,
+    pub episode_api: Option<EpisodeApi>,
     pub ffprobe_path: Option<PathBuf>,
     pub format_movie: Option<String>,
     pub format_episode: Option<String>,
