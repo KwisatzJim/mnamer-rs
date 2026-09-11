@@ -67,6 +67,23 @@ impl TvmazeClient {
             .collect())
     }
 
+    pub(crate) fn series_by_id(&self, series_id: u64) -> Result<Option<SeriesMatch>> {
+        let request = self.http.get(format!("{BASE_URL}/shows/{series_id}"));
+        let response = self.send_with_retry(request)?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        Self::check_status(&response)?;
+        let show: RawShow = response
+            .json()
+            .context("failed to parse TVmaze series response")?;
+        Ok(Some(SeriesMatch {
+            id: show.id,
+            name: show.name,
+            first_air_year: show.premiered.as_deref().and_then(Self::year_from_date),
+        }))
+    }
+
     pub(crate) fn season_episodes(
         &self,
         series_id: u64,

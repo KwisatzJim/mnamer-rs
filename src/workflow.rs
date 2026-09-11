@@ -25,7 +25,7 @@ pub(crate) fn run(args: Args) -> Result<()> {
 
 pub(crate) fn run_with_client<C: MetadataProvider>(
     args: Args,
-    create_client: impl FnOnce(String, EpisodeApi) -> Result<C>,
+    create_client: impl FnOnce(Option<String>, EpisodeApi) -> Result<C>,
 ) -> Result<()> {
     let cfg = config::load(args.config.as_deref())?;
 
@@ -34,6 +34,11 @@ pub(crate) fn run_with_client<C: MetadataProvider>(
     let lower = resolve_bool(args.lower, args.no_lower, cfg.lower);
     let scene = resolve_bool(args.scene, args.no_scene, cfg.scene);
     let episode_api = resolve_episode_api(args.episode_api, cfg.episode_api);
+    let api_key = resolve_api_key(&args, &cfg);
+    if let Some(query) = args.search_series.as_deref() {
+        let client = create_client(api_key, episode_api)?;
+        return print_series_search(&client, query, episode_api);
+    }
     let output_dir = args.output_dir.clone().or_else(|| cfg.output_dir.clone());
     let ffprobe = resolve_ffprobe_path(args.ffprobe.as_deref(), cfg.ffprobe_path.as_deref())?;
     let extensions = args
@@ -93,7 +98,6 @@ pub(crate) fn run_with_client<C: MetadataProvider>(
         return ensure_no_failures(failed);
     }
 
-    let api_key = resolve_api_key(&args, &cfg)?;
     let client = create_client(api_key, episode_api)?;
     let mut log = RunLog::new(args.log.as_deref())?;
 
@@ -154,7 +158,19 @@ pub(crate) fn run_with_client<C: MetadataProvider>(
                 episode,
                 episode_end,
                 ..
-            } => match resolve_episode(&client, series, *season, *episode, *episode_end, batch) {
+            } => match resolve_episode(
+                &client,
+                EpisodeLookup {
+                    series,
+                    season: *season,
+                    episode: *episode,
+                    episode_end: *episode_end,
+                    batch,
+                    series_id: args.series_id,
+                    episode_api,
+                    series_mappings: &cfg.series_mappings,
+                },
+            ) {
                 Err(error) => {
                     eprintln!("{} {error:#}", style("  failed:").red().bold());
                     log.record(f, None, "failed", &format!("{error:#}"))?;
@@ -579,61 +595,122 @@ pub(crate) fn resolve_movie(
     Ok(Some(matches.into_iter().nth(idx).unwrap()))
 }
 
-pub(crate) fn resolve_episode(
+pub(crate) fn print_series_search(
     client: &impl MetadataProvider,
-    series: &str,
+    query: &str,
+    episode_api: EpisodeApi,
+) -> Result<()> {
+    if query.trim().is_empty() {
+        anyhow::bail!("--search-series query cannot be empty");
+    }
+    let matches = client
+        .search_series(query)
+        .context("series search failed")?;
+    if matches.is_empty() {
+        println!(
+            "No {} series matches found for {:?}.",
+            episode_api.display_name(),
+            query
+        );
+        return Ok(());
+    }
+    println!(
+        "{} series matches for {:?}:",
+        episode_api.display_name(),
+        query
+    );
+    for series in &matches {
+        println!("  {}", series_match_label(series, episode_api));
+    }
+    Ok(())
+}
+
+pub(crate) struct EpisodeLookup<'a> {
+    series: &'a str,
     season: u32,
     episode: u32,
     episode_end: Option<u32>,
     batch: bool,
+    series_id: Option<u64>,
+    episode_api: EpisodeApi,
+    series_mappings: &'a [config::SeriesMapping],
+}
+
+pub(crate) fn resolve_episode(
+    client: &impl MetadataProvider,
+    request: EpisodeLookup<'_>,
 ) -> Result<Option<(SeriesMatch, String)>> {
-    let matches = client
-        .search_series(series)
-        .context("series search failed")?;
-    if matches.is_empty() {
-        println!("{}", style("  no TMDb series matches found").yellow());
-        return Ok(None);
-    }
-    let chosen = if batch {
-        let candidate = &matches[0];
-        if !title_match_is_confident(series, &candidate.name) {
-            println!(
-                "{} batch mode rejected uncertain match: {} ({})",
-                style("  skipped:").yellow().bold(),
-                candidate.name,
-                candidate
-                    .first_air_year
-                    .map(|year| year.to_string())
-                    .unwrap_or_else(|| "?".to_string())
-            );
-            return Ok(None);
-        }
-        matches.into_iter().next().unwrap()
-    } else {
-        let labels: Vec<String> = matches
-            .iter()
-            .map(|m| {
+    let EpisodeLookup {
+        series,
+        season,
+        episode,
+        episode_end,
+        batch,
+        series_id,
+        episode_api,
+        series_mappings,
+    } = request;
+    let series_id = series_id.or(series_mapping_id(series_mappings, series, episode_api)?);
+    let chosen = if let Some(series_id) = series_id {
+        let chosen = client
+            .series_by_id(series_id)
+            .context("series ID lookup failed")?
+            .with_context(|| {
                 format!(
-                    "{} ({})",
-                    m.name,
-                    m.first_air_year
-                        .map(|y| y.to_string())
-                        .unwrap_or_else(|| "?".into())
+                    "no series exists with ID {series_id} in the selected episode provider; file left unchanged"
                 )
-            })
-            .chain(std::iter::once("Skip this file".to_string()))
-            .collect();
-        let default = default_series_match_index(series, &matches);
-        let idx = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("  Select a series match")
-            .items(&labels)
-            .default(default)
-            .interact()
-            .unwrap_or(labels.len() - 1);
-        if idx >= matches.len() {
+            })?;
+        println!(
+            "{} {} ({})",
+            style(format!("  using series ID {series_id}:")).cyan(),
+            chosen.name,
+            chosen
+                .first_air_year
+                .map(|year| year.to_string())
+                .unwrap_or_else(|| "?".to_string())
+        );
+        chosen
+    } else {
+        let matches = client
+            .search_series(series)
+            .context("series search failed")?;
+        if matches.is_empty() {
+            println!("{}", style("  no series matches found").yellow());
             return Ok(None);
         }
-        matches.into_iter().nth(idx).unwrap()
+        if batch {
+            let candidate = &matches[0];
+            if !title_match_is_confident(series, &candidate.name) {
+                println!(
+                    "{} batch mode rejected uncertain match: {} ({})",
+                    style("  skipped:").yellow().bold(),
+                    candidate.name,
+                    candidate
+                        .first_air_year
+                        .map(|year| year.to_string())
+                        .unwrap_or_else(|| "?".to_string())
+                );
+                return Ok(None);
+            }
+            matches.into_iter().next().unwrap()
+        } else {
+            let labels: Vec<String> = matches
+                .iter()
+                .map(|m| series_match_label(m, episode_api))
+                .chain(std::iter::once("Skip this file".to_string()))
+                .collect();
+            let default = default_series_match_index(series, &matches);
+            let idx = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("  Select a series match")
+                .items(&labels)
+                .default(default)
+                .interact()
+                .unwrap_or(labels.len() - 1);
+            if idx >= matches.len() {
+                return Ok(None);
+            }
+            matches.into_iter().nth(idx).unwrap()
+        }
     };
 
     let final_episode = episode_end.unwrap_or(episode);
@@ -650,13 +727,13 @@ pub(crate) fn resolve_episode(
         requested_episode_metadata_issue(&season_episodes, episode, final_episode, &today)
     {
         anyhow::bail!(
-            "TMDb episode metadata is not ready ({reason}); file left unchanged. Try again after TMDb updates the episode"
+            "episode metadata is not ready ({reason}); file left unchanged. Try again after the selected provider updates the episode"
         );
     }
     if let Some(reason) = season_metadata_issue(&season_episodes, &today) {
         if batch {
             anyhow::bail!(
-                "TMDb season metadata is not ready ({reason}); batch mode left the file unchanged. Try an interactive run to review the requested episode"
+                "season metadata is not ready ({reason}); batch mode left the file unchanged. Try an interactive run to review the requested episode"
             );
         }
         println!(
@@ -673,12 +750,61 @@ pub(crate) fn resolve_episode(
             .map(|candidate| candidate.name.clone())
             .with_context(|| {
                 format!(
-                    "TMDb season does not contain episode {episode_number}; file left unchanged"
+                    "selected provider does not contain episode {episode_number}; file left unchanged"
                 )
             })?;
         titles.push(title);
     }
     Ok(Some((chosen, titles.join(" + "))))
+}
+
+pub(crate) fn series_mapping_id(
+    mappings: &[config::SeriesMapping],
+    parsed_title: &str,
+    episode_api: EpisodeApi,
+) -> Result<Option<u64>> {
+    let key = mapping_title_key(parsed_title);
+    let matching_ids = mappings
+        .iter()
+        .filter(|mapping| {
+            mapping.episode_api == episode_api && mapping_title_key(&mapping.title) == key
+        })
+        .map(|mapping| mapping.series_id)
+        .collect::<HashSet<_>>();
+    if matching_ids.contains(&0) {
+        anyhow::bail!(
+            "series mapping for {parsed_title:?} has invalid series_id 0; file left unchanged"
+        );
+    }
+    if matching_ids.len() > 1 {
+        anyhow::bail!(
+            "series mapping for {parsed_title:?} has conflicting {} IDs; file left unchanged",
+            episode_api.display_name()
+        );
+    }
+    Ok(matching_ids.into_iter().next())
+}
+
+fn mapping_title_key(title: &str) -> String {
+    title
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+pub(crate) fn series_match_label(series: &SeriesMatch, episode_api: EpisodeApi) -> String {
+    format!(
+        "{} ({}) [{} ID: {}]",
+        series.name,
+        series
+            .first_air_year
+            .map(|year| year.to_string())
+            .unwrap_or_else(|| "?".to_string()),
+        episode_api.display_name(),
+        series.id
+    )
 }
 
 fn requested_episode_metadata_issue(
@@ -775,28 +901,23 @@ fn civil_date_from_unix_days(days: i64) -> (i64, i64, i64) {
     (year, month, day)
 }
 
-pub(crate) fn resolve_api_key(args: &Args, cfg: &config::FileConfig) -> Result<String> {
+pub(crate) fn resolve_api_key(args: &Args, cfg: &config::FileConfig) -> Option<String> {
     if let Some(k) = &args.api_key {
-        return Ok(k.clone());
+        if !k.is_empty() {
+            return Some(k.clone());
+        }
     }
     if let Ok(k) = std::env::var("TMDB_API_KEY") {
         if !k.is_empty() {
-            return Ok(k);
+            return Some(k);
         }
     }
     if let Some(k) = &cfg.api_key {
         if !k.is_empty() {
-            return Ok(k.clone());
+            return Some(k.clone());
         }
     }
-    anyhow::bail!(
-        "No TMDb API key found. Pass --api-key, set $TMDB_API_KEY, or add \
-         `api_key = \"...\"` to your config file ({}). Get a free key at \
-         https://www.themoviedb.org/settings/api",
-        config::default_config_path()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "config.toml".to_string())
-    );
+    None
 }
 
 #[cfg(test)]

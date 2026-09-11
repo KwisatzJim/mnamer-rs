@@ -54,11 +54,13 @@ cargo install --git https://github.com/KwisatzJim/mnamer-rs
 
 ## API key
 
-You need a free TMDb API key: https://www.themoviedb.org/settings/api
+Movies and TMDb television lookups need a free TMDb API key:
+https://www.themoviedb.org/settings/api
 (the "API Read Access Token" page — grab the v3 "API Key", not the v4 token).
-TMDb is always used for movies and is the default television provider. TVmaze
-does not require its own key, but `mnamer-rs` still requires the TMDb key so
-movie lookup remains available during the same run.
+TMDb is always used for movies and is the default television provider. A run
+containing only television episodes with `--episode-api tvmaze` does not require
+an API key. If a movie is encountered in that run, only that movie fails with a
+clear TMDb-key message; the TVmaze episodes continue processing.
 
 Provide it any of three ways:
 
@@ -85,6 +87,14 @@ api_key = "your_tmdb_api_key_here"
 # Television metadata provider: "tmdb" (default) or "tvmaze"
 episode_api = "tmdb"
 
+# Optional saved matches for titles that are hard to identify reliably.
+# The title is compared without case or punctuation differences. Provider IDs
+# come from --search-series and are not interchangeable between providers.
+[[series_mappings]]
+title = "The Paper"
+episode_api = "tvmaze"
+series_id = 84611
+
 # Optional absolute path to ffprobe; otherwise it is found on PATH
 ffprobe_path = "/opt/homebrew/bin/ffprobe"
 
@@ -107,8 +117,9 @@ recursive = false
 batch = false
 ```
 
-Anything not listed above (e.g. `--media`, `--dry-run`, `--force-copy`,
-`--parse-only`) is CLI-only and has no config.toml equivalent.
+Anything not listed above (e.g. `--media`, `--series-id`, `--search-series`,
+`--dry-run`, `--force-copy`, `--parse-only`) is CLI-only and has no config.toml
+equivalent.
 
 ## Usage
 
@@ -121,6 +132,15 @@ mnamer-rs --dry-run --recursive ~/Downloads/media
 
 # Use TVmaze instead of TMDb for television series and episode titles
 mnamer-rs --episode-api tvmaze --dry-run ~/Downloads/episodes
+
+# Search TVmaze and display matching show names, years, and IDs; no files needed
+mnamer-rs --episode-api tvmaze --search-series "The Paper"
+
+# Search TMDb instead (requires the configured TMDb API key)
+mnamer-rs --episode-api tmdb --search-series "The Paper"
+
+# Bypass fuzzy series-name matching with an exact ID from the selected provider
+mnamer-rs --episode-api tvmaze --series-id 169 --dry-run Breaking.Bad.S05E14.mkv
 
 # Use ffprobe directly, without changing your shell PATH
 mnamer-rs --ffprobe /opt/homebrew/bin/ffprobe --dry-run --batch ~/Downloads/media
@@ -173,9 +193,17 @@ record is flushed immediately, though this is not a guarantee against power loss
    TVmaze when `--episode-api tvmaze` (or `episode_api = "tvmaze"` in the
    config) is selected. Episode lookup fetches the provider's season/episode
    list so the requested titles and air dates can be validated before rename
-   planning.
+   planning. `--series-id ID` bypasses series-name search and uses that exact
+   ID from the selected provider; TVmaze and TMDb IDs are not interchangeable.
+   The override applies to every episode target in that run, so use it only
+   when all episode files belong to the same series. Episode metadata safety
+   checks still run normally. A matching `[[series_mappings]]` config entry
+   provides the same safe bypass for future runs. Precedence is:
+   `--series-id` > matching config mapping > provider name search.
 3. **Confirm** — unless `--batch` is passed, you get an interactive picker
    (via `dialoguer`) to choose among the returned matches, or skip the file.
+   Each television choice includes its provider and series ID, making it easy
+   to copy the correct value into `--series-id` or `series_mappings`.
    If the provider returns only uncertain title matches, the picker defaults to
    `Skip this file` rather than placing a likely-wrong show under the cursor.
 4. **Rename** — `src/rename.rs` renders your template, sanitizes illegal

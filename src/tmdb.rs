@@ -25,6 +25,7 @@ pub struct TmdbClient {
 pub(crate) trait MetadataProvider {
     fn search_movie(&self, title: &str, year: Option<u32>) -> Result<Vec<MovieMatch>>;
     fn search_series(&self, name: &str) -> Result<Vec<SeriesMatch>>;
+    fn series_by_id(&self, series_id: u64) -> Result<Option<SeriesMatch>>;
     fn season_episodes(&self, series_id: u64, season: u32) -> Result<Vec<SeasonEpisode>>;
 }
 
@@ -34,6 +35,9 @@ impl MetadataProvider for TmdbClient {
     }
     fn search_series(&self, name: &str) -> Result<Vec<SeriesMatch>> {
         TmdbClient::search_series(self, name)
+    }
+    fn series_by_id(&self, series_id: u64) -> Result<Option<SeriesMatch>> {
+        TmdbClient::series_by_id(self, series_id)
     }
     fn season_episodes(&self, series_id: u64, season: u32) -> Result<Vec<SeasonEpisode>> {
         TmdbClient::season_episodes(self, series_id, season)
@@ -155,6 +159,27 @@ impl TmdbClient {
                 first_air_year: Self::year_from_date(&s.first_air_date),
             })
             .collect())
+    }
+
+    pub fn series_by_id(&self, series_id: u64) -> Result<Option<SeriesMatch>> {
+        let req = self
+            .http
+            .get(format!("{BASE_URL}/tv/{series_id}"))
+            .query(&[("api_key", self.api_key.as_str())]);
+        let resp = self.send_with_retry(req)?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        Self::check_status(&resp)?;
+        let series: RawSeries = resp
+            .json()
+            .map_err(redact_request_url)
+            .context("failed to parse TMDb series response")?;
+        Ok(Some(SeriesMatch {
+            id: series.id,
+            name: series.name,
+            first_air_year: Self::year_from_date(&series.first_air_date),
+        }))
     }
 
     /// Returns the whole season so callers can reject incomplete metadata

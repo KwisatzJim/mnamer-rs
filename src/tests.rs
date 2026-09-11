@@ -5,12 +5,42 @@ use crate::operations::*;
 use crate::quality::*;
 use crate::report::RunLog;
 use crate::scanning::*;
-use crate::tmdb::MovieMatch;
+use crate::tmdb::{MovieMatch, SeriesMatch};
 use crate::workflow::*;
 use clap::Parser as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
+
+#[test]
+fn series_picker_label_includes_provider_and_id() {
+    let series = SeriesMatch {
+        id: 84611,
+        name: "The Paper".into(),
+        first_air_year: Some(2025),
+    };
+    assert_eq!(
+        series_match_label(&series, EpisodeApi::Tvmaze),
+        "The Paper (2025) [TVmaze ID: 84611]"
+    );
+}
+
+#[test]
+fn saved_series_mappings_ignore_case_and_punctuation_and_are_provider_specific() {
+    let mappings = [config::SeriesMapping {
+        title: "The Paper".into(),
+        episode_api: EpisodeApi::Tvmaze,
+        series_id: 84611,
+    }];
+    assert_eq!(
+        series_mapping_id(&mappings, "The.Paper", EpisodeApi::Tvmaze).unwrap(),
+        Some(84611)
+    );
+    assert_eq!(
+        series_mapping_id(&mappings, "The Paper", EpisodeApi::Tmdb).unwrap(),
+        None
+    );
+}
 
 #[test]
 fn ffprobe_path_precedence_and_validation() {

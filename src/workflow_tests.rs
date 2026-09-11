@@ -35,6 +35,13 @@ impl MetadataProvider for Metadata {
             first_air_year: Some(2026),
         }])
     }
+    fn series_by_id(&self, series_id: u64) -> Result<Option<SeriesMatch>> {
+        Ok((series_id == 1).then(|| SeriesMatch {
+            id: series_id,
+            name: "ID Selected Show".into(),
+            first_air_year: Some(2026),
+        }))
+    }
     fn season_episodes(&self, _: u64, _: u32) -> Result<Vec<SeasonEpisode>> {
         Ok((1..=10)
             .map(|episode_number| SeasonEpisode {
@@ -99,6 +106,57 @@ fn incomplete_season_metadata_leaves_episode_unchanged() {
         .unwrap()
         .contains("episode 4 still has a placeholder title"));
 }
+
+#[test]
+fn explicit_series_id_bypasses_name_search_and_uses_selected_series() {
+    let f = Fixture::new();
+    f.write("Wrong.Name.S01E05.mkv", b"episode");
+    f.run(&["--series-id", "1"], &["Wrong.Name.S01E05.mkv"])
+        .unwrap();
+    assert_eq!(
+        std::fs::read(f.path("ID Selected Show - S01E05 - Title 5.mkv")).unwrap(),
+        b"episode"
+    );
+}
+
+#[test]
+fn unknown_explicit_series_id_leaves_file_unchanged() {
+    let f = Fixture::new();
+    f.write("Show.S01E05.mkv", b"episode");
+    let error = f
+        .run(&["--series-id", "999"], &["Show.S01E05.mkv"])
+        .unwrap_err();
+    assert!(error.to_string().contains("1 file failed"));
+    assert_eq!(
+        std::fs::read(f.path("Show.S01E05.mkv")).unwrap(),
+        b"episode"
+    );
+    assert!(f.records()[0]["reason"]
+        .as_str()
+        .unwrap()
+        .contains("no series exists with ID 999"));
+}
+
+#[test]
+fn saved_series_mapping_bypasses_name_search() {
+    let f = Fixture::new();
+    f.write(
+        "config.toml",
+        br#"
+        [[series_mappings]]
+        title = "Wrong Name"
+        episode_api = "tmdb"
+        series_id = 1
+        "#,
+    );
+    f.write("Wrong.Name.S01E05.mkv", b"episode");
+    f.run(&[], &["Wrong.Name.S01E05.mkv"]).unwrap();
+    assert_eq!(
+        std::fs::read(f.path("ID Selected Show - S01E05 - Title 5.mkv")).unwrap(),
+        b"episode"
+    );
+}
+
 impl Fixture {
     fn new() -> Self {
         let result = Self {
@@ -107,6 +165,7 @@ impl Fixture {
         result.write("config.toml", b"");
         result
     }
+
     fn path(&self, name: &str) -> PathBuf {
         self.directory.path().join(name)
     }
@@ -129,6 +188,17 @@ impl Fixture {
         args.extend(names.iter().map(|name| self.path(name).into_os_string()));
         Args::parse_from(args)
     }
+    fn args_without_key(&self, flags: &[&str], names: &[&str]) -> Args {
+        let mut args = vec![
+            "mnamer-rs".into(),
+            "--config".into(),
+            self.path("config.toml").into_os_string(),
+            "--batch".into(),
+        ];
+        args.extend(flags.iter().map(std::ffi::OsString::from));
+        args.extend(names.iter().map(|name| self.path(name).into_os_string()));
+        Args::parse_from(args)
+    }
     fn run(&self, flags: &[&str], names: &[&str]) -> Result<()> {
         run_with_client(self.args(flags, names), |_, _| {
             Ok(Metadata {
@@ -145,6 +215,52 @@ impl Fixture {
             .map(|line| serde_json::from_str(line).unwrap())
             .collect()
     }
+}
+
+#[test]
+fn tvmaze_episode_run_passes_an_optional_tmdb_key_to_the_client() {
+    let f = Fixture::new();
+    f.write("Show.S01E05.mkv", b"episode");
+    run_with_client(
+        f.args_without_key(
+            &["--episode-api", "tvmaze", "--dry-run"],
+            &["Show.S01E05.mkv"],
+        ),
+        |api_key, episode_api| {
+            assert!(api_key.is_none());
+            assert_eq!(episode_api, crate::cli::EpisodeApi::Tvmaze);
+            Ok(Metadata {
+                remove_before_beta: None,
+                fail_alpha: false,
+                incomplete_season: false,
+            })
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn series_search_does_not_need_a_media_target() {
+    let f = Fixture::new();
+    let args = Args::parse_from([
+        "mnamer-rs",
+        "--config",
+        f.path("config.toml").to_str().unwrap(),
+        "--episode-api",
+        "tvmaze",
+        "--search-series",
+        "Show",
+    ]);
+    run_with_client(args, |api_key, episode_api| {
+        assert!(api_key.is_none());
+        assert_eq!(episode_api, crate::cli::EpisodeApi::Tvmaze);
+        Ok(Metadata {
+            remove_before_beta: None,
+            fail_alpha: false,
+            incomplete_season: false,
+        })
+    })
+    .unwrap();
 }
 
 #[test]

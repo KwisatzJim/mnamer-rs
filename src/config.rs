@@ -17,6 +17,15 @@ pub struct FileConfig {
     pub scene: Option<bool>,
     pub recursive: Option<bool>,
     pub batch: Option<bool>,
+    #[serde(default)]
+    pub series_mappings: Vec<SeriesMapping>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct SeriesMapping {
+    pub title: String,
+    pub episode_api: EpisodeApi,
+    pub series_id: u64,
 }
 
 /// Always ~/.config/mnamer-rs/config.toml, on every platform (including
@@ -73,5 +82,23 @@ mod tests {
 
         assert!(error.to_string().contains("failed to read config file"));
         assert!(error.to_string().contains("missing.toml"));
+    }
+
+    #[test]
+    fn parses_provider_specific_series_mappings() {
+        let config: FileConfig = toml::from_str(
+            r#"
+            [[series_mappings]]
+            title = "The Paper"
+            episode_api = "tvmaze"
+            series_id = 84611
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.series_mappings.len(), 1);
+        assert_eq!(config.series_mappings[0].title, "The Paper");
+        assert_eq!(config.series_mappings[0].episode_api, EpisodeApi::Tvmaze);
+        assert_eq!(config.series_mappings[0].series_id, 84611);
     }
 }

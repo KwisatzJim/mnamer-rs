@@ -16,6 +16,15 @@ pub enum EpisodeApi {
     Tvmaze,
 }
 
+impl EpisodeApi {
+    pub(crate) fn display_name(self) -> &'static str {
+        match self {
+            Self::Tmdb => "TMDb",
+            Self::Tvmaze => "TVmaze",
+        }
+    }
+}
+
 /// Built-in fallback defaults, used only if neither the CLI flag nor the
 /// config file set a value.
 pub const DEFAULT_FORMAT_MOVIE: &str = "{title} ({year}){ext}";
@@ -37,7 +46,7 @@ pub const DEFAULT_EXTENSIONS: &[&str] = &[
 #[command(name = "mnamer-rs", version, about, long_about = None)]
 pub struct Args {
     /// Files or directories to process
-    #[arg(required = true)]
+    #[arg(required_unless_present = "search_series")]
     pub targets: Vec<PathBuf>,
 
     /// Recurse into subdirectories
@@ -73,13 +82,28 @@ pub struct Args {
     #[arg(long)]
     pub force_copy: bool,
 
-    /// TMDb v3 API key. Falls back to $TMDB_API_KEY, then the config file.
+    /// TMDb v3 API key. Required for movies or TMDb episodes; not TVmaze-only runs.
+    /// Falls back to $TMDB_API_KEY, then the config file.
     #[arg(long)]
     pub api_key: Option<String>,
 
     /// Metadata provider for television episodes (default: tmdb)
     #[arg(long, value_enum)]
     pub episode_api: Option<EpisodeApi>,
+
+    /// Search the selected episode provider and print matching series IDs,
+    /// without scanning or renaming files
+    #[arg(
+        long,
+        value_name = "QUERY",
+        conflicts_with_all = ["series_id", "targets"]
+    )]
+    pub search_series: Option<String>,
+
+    /// Use this exact series ID from the selected episode provider, bypassing
+    /// series-name search. Applies to every episode target in this run.
+    #[arg(long, value_name = "ID", conflicts_with = "search_series")]
+    pub series_id: Option<u64>,
 
     /// Movie filename template. Placeholders: {title} {year} {ext}
     /// [default: "{title} ({year}){ext}", overridable in config.toml]
