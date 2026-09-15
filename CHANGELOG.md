@@ -1,6 +1,17 @@
 # Changelog
 
-## 0.2.0 - Unreleased
+## 0.3.0 - 2026-09-15
+
+- Add TVmaze as an explicitly selectable television metadata provider.
+- Allow TVmaze-only episode runs without a TMDb API key.
+- Add provider-specific `--series-id` overrides, saved series mappings, and
+  lookup-only `--search-series` results with visible provider IDs.
+- Accept temporary episode titles such as `Episode 4`, `TBA`, and `TBD` so
+  files can be renamed now and refreshed after provider metadata improves.
+- Update the minimum supported Rust version to 1.98.1 and refresh compatible
+  dependencies.
+
+## 0.2.0 - 2026-09-06
 
 - Continue batches after per-file lookup and filesystem failures, with nonzero
   exit status when failures occurred.

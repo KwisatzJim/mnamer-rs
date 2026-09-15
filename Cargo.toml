@@ -1,6 +1,6 @@
 [package]
 name = "mnamer-rs"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.98.1"
 description = "A terminal media file renamer, inspired by mnamer and RenameMyTVSeries."
