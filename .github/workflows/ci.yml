@@ -11,11 +11,11 @@ permissions:
 
 jobs:
   minimum-rust:
-    name: Minimum Rust 1.75 (Ubuntu)
+    name: Minimum Rust 1.98.1 (Ubuntu)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.75.0
+      - uses: dtolnay/rust-toolchain@1.98.1
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
 

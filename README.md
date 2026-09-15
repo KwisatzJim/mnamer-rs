@@ -27,6 +27,8 @@ the.office.3x05.business.school.avi           -> The Office - S03E05 - Business 
 
 ## Building
 
+Requires Rust 1.98.1 or newer.
+
 ```
 cargo build --release
 ```
@@ -36,15 +38,13 @@ The binary is at `target/release/mnamer-rs`.
 The release workflow is prepared to build archives for Linux x86-64 and macOS
 ARM64. See
 [Linux release and verification](docs/LINUX_RELEASE.md) for checksum, install,
-and hands-on test instructions. Version 0.2.0 remains unreleased until its
-source and CI results have been reviewed and the release tag is explicitly
-approved.
+and hands-on test instructions. Releases are created from explicitly pushed
+version tags such as `v0.2.0`.
 
-> Note: this repo pins several transitive dependencies (`indexmap`, `url`,
-> `tempfile`, `toml_edit`, `getrandom`, `zeroize`) to slightly older versions.
-> That's only needed because this was built/tested against Rust 1.75; if
-> you're on a current stable toolchain you can safely remove those pins from
-> `Cargo.toml` and `cargo update`.
+The project declares Rust 1.98.1 as its minimum supported Rust version and CI
+tests that version explicitly on Ubuntu. Dependencies use normal compatible
+version ranges, while `Cargo.lock` records the exact versions used for
+repeatable application builds.
 
 ## Install from GitHub
 
@@ -326,6 +326,8 @@ cargo build --release --offline
 ## What's not implemented
 
 Compared to `mnamer`/RenameMyTVSeries this is intentionally lean:
-- Only TMDb is supported (no TVDb/OMDb fallback providers).
-- No fuzzy "did you mean" correction beyond what TMDb's own search returns.
+- Television providers are selected explicitly; there is no automatic fallback
+  between TMDb and TVmaze, and no TVDb/OMDb provider.
+- No fuzzy "did you mean" correction beyond what the selected provider's own
+  search returns.
 These would be reasonable next additions if you want them.
