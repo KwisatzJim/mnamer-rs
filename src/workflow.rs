@@ -835,16 +835,8 @@ fn requested_episode_metadata_issue(
 
 fn episode_metadata_issue(episode: &SeasonEpisode) -> Option<String> {
     let name = episode.name.trim();
-    let placeholder = format!("episode {}", episode.episode_number);
-    if name.is_empty()
-        || name.eq_ignore_ascii_case(&placeholder)
-        || name.eq_ignore_ascii_case("tba")
-        || name.eq_ignore_ascii_case("tbd")
-    {
-        return Some(format!(
-            "episode {} still has a placeholder title",
-            episode.episode_number
-        ));
+    if name.is_empty() {
+        return Some(format!("episode {} has no title", episode.episode_number));
     }
     if episode.air_date.is_empty() {
         return Some(format!(
@@ -936,14 +928,17 @@ mod metadata_tests {
     }
 
     #[test]
-    fn incomplete_season_reports_placeholder_title() {
+    fn placeholder_titles_are_accepted() {
         let episodes = [
             episode(1, "Real Title", "2026-09-09"),
             episode(2, "Episode 2", "2026-09-09"),
+            episode(3, "TBA", "2026-09-09"),
+            episode(4, "TBD", "2026-09-09"),
         ];
+        assert_eq!(season_metadata_issue(&episodes, "2026-09-09"), None);
         assert_eq!(
-            season_metadata_issue(&episodes, "2026-09-09").as_deref(),
-            Some("episode 2 still has a placeholder title")
+            requested_episode_metadata_issue(&episodes, 2, 4, "2026-09-09"),
+            None
         );
     }
 
@@ -957,24 +952,27 @@ mod metadata_tests {
             requested_episode_metadata_issue(&episodes, 8, 8, "2026-09-09"),
             None
         );
-        assert_eq!(
-            season_metadata_issue(&episodes, "2026-09-09").as_deref(),
-            Some("episode 9 still has a placeholder title")
-        );
+        assert_eq!(season_metadata_issue(&episodes, "2026-09-09"), None);
     }
 
     #[test]
-    fn requested_placeholder_or_future_episode_is_rejected() {
+    fn empty_or_future_episode_metadata_is_rejected() {
         let placeholder = [episode(2, "Episode 2", "2026-09-09")];
         assert_eq!(
-            requested_episode_metadata_issue(&placeholder, 2, 2, "2026-09-09").as_deref(),
-            Some("episode 2 still has a placeholder title")
+            requested_episode_metadata_issue(&placeholder, 2, 2, "2026-09-09"),
+            None
         );
 
         let tba = [episode(2, "TBA", "2026-09-09")];
         assert_eq!(
-            requested_episode_metadata_issue(&tba, 2, 2, "2026-09-09").as_deref(),
-            Some("episode 2 still has a placeholder title")
+            requested_episode_metadata_issue(&tba, 2, 2, "2026-09-09"),
+            None
+        );
+
+        let empty = [episode(2, "", "2026-09-09")];
+        assert_eq!(
+            requested_episode_metadata_issue(&empty, 2, 2, "2026-09-09").as_deref(),
+            Some("episode 2 has no title")
         );
 
         let future = [episode(2, "A Real Title", "2026-09-10")];

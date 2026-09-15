@@ -182,8 +182,8 @@ impl TmdbClient {
         }))
     }
 
-    /// Returns the whole season so callers can reject incomplete metadata
-    /// rather than trusting a mixture of real and placeholder episode names.
+    /// Returns the whole season so callers can validate requested episode
+    /// presence and air dates before planning a rename.
     pub fn season_episodes(&self, series_id: u64, season: u32) -> Result<Vec<SeasonEpisode>> {
         let url = format!("{BASE_URL}/tv/{series_id}/season/{season}");
         let req = self

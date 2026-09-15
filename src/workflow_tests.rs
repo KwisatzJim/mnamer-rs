@@ -83,28 +83,22 @@ fn invalid_episode_range_is_logged_before_lookup_and_valid_episode_continues() {
 }
 
 #[test]
-fn incomplete_season_metadata_leaves_episode_unchanged() {
+fn placeholder_title_is_accepted_and_can_be_updated_by_a_later_run() {
     let f = Fixture::new();
-    f.write("Show.S01E05.mkv", b"episode");
-    let error = run_with_client(f.args(&[], &["Show.S01E05.mkv"]), |_, _| {
+    f.write("Show.S01E04.mkv", b"episode");
+    run_with_client(f.args(&[], &["Show.S01E04.mkv"]), |_, _| {
         Ok(Metadata {
             remove_before_beta: None,
             fail_alpha: false,
             incomplete_season: true,
         })
     })
-    .unwrap_err();
-    assert!(error.to_string().contains("1 file failed"));
+    .unwrap();
     assert_eq!(
-        std::fs::read(f.path("Show.S01E05.mkv")).unwrap(),
+        std::fs::read(f.path("Show - S01E04 - Episode 4.mkv")).unwrap(),
         b"episode"
     );
-    let records = f.records();
-    assert_eq!(records[0]["status"], "failed");
-    assert!(records[0]["reason"]
-        .as_str()
-        .unwrap()
-        .contains("episode 4 still has a placeholder title"));
+    assert_eq!(f.records()[0]["status"], "renamed");
 }
 
 #[test]

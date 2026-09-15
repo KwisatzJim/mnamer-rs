@@ -287,11 +287,13 @@ TVmaze data for TMDb data or vice versa.
 
 ## Incomplete episode metadata
 
-The requested episode must have a non-placeholder title and an air date that is
-not in the future. Interactive runs warn when unrelated episodes in the season
-still have incomplete metadata, but allow you to review the valid requested
-episode. Batch mode is intentionally stricter and leaves the file unchanged when
-any episode in the season still has incomplete metadata.
+Placeholder titles such as `Episode 4`, `TBA`, and `TBD` are accepted so newly
+released episodes do not block a rename workflow. The resulting filename stays
+parseable: run it through `mnamer-rs` again later and the provider's updated
+title can replace the placeholder. An episode is still rejected when it is
+missing from the provider, has an empty title or missing air date, or has an air
+date in the future. Batch mode also continues to reject seasons containing
+those kinds of incomplete metadata.
 
 ## Metadata credits
 
