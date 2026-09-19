@@ -73,7 +73,7 @@ struct SearchResponse<T> {
 struct RawMovie {
     title: String,
     #[serde(default)]
-    release_date: String,
+    release_date: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -81,15 +81,16 @@ struct RawSeries {
     id: u64,
     name: String,
     #[serde(default)]
-    first_air_date: String,
+    first_air_date: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct RawEpisode {
     episode_number: u32,
-    name: String,
     #[serde(default)]
-    air_date: String,
+    name: Option<String>,
+    #[serde(default)]
+    air_date: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -134,7 +135,7 @@ impl TmdbClient {
             .into_iter()
             .map(|m| MovieMatch {
                 title: m.title,
-                year: Self::year_from_date(&m.release_date),
+                year: m.release_date.as_deref().and_then(Self::year_from_date),
             })
             .collect())
     }
@@ -156,7 +157,7 @@ impl TmdbClient {
             .map(|s| SeriesMatch {
                 id: s.id,
                 name: s.name,
-                first_air_year: Self::year_from_date(&s.first_air_date),
+                first_air_year: s.first_air_date.as_deref().and_then(Self::year_from_date),
             })
             .collect())
     }
@@ -178,7 +179,10 @@ impl TmdbClient {
         Ok(Some(SeriesMatch {
             id: series.id,
             name: series.name,
-            first_air_year: Self::year_from_date(&series.first_air_date),
+            first_air_year: series
+                .first_air_date
+                .as_deref()
+                .and_then(Self::year_from_date),
         }))
     }
 
@@ -204,8 +208,8 @@ impl TmdbClient {
             .into_iter()
             .map(|episode| SeasonEpisode {
                 episode_number: episode.episode_number,
-                name: episode.name,
-                air_date: episode.air_date,
+                name: episode.name.unwrap_or_default(),
+                air_date: episode.air_date.unwrap_or_default(),
             })
             .collect())
     }
@@ -306,6 +310,26 @@ fn retry_after_delay(header: Option<&str>, now: SystemTime, fallback: Duration) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accepts_null_dates_and_episode_names_from_tmdb() {
+        let season: RawSeason = serde_json::from_str(
+            r#"{"episodes":[{"episode_number":1,"name":null,"air_date":null}]}"#,
+        )
+        .unwrap();
+        assert_eq!(season.episodes[0].name, None);
+        assert_eq!(season.episodes[0].air_date, None);
+
+        let series: RawSeries = serde_json::from_str(
+            r#"{"id":207484,"name":"Outlander: Blood of My Blood","first_air_date":null}"#,
+        )
+        .unwrap();
+        assert_eq!(series.first_air_date, None);
+
+        let movie: RawMovie =
+            serde_json::from_str(r#"{"title":"Example","release_date":null}"#).unwrap();
+        assert_eq!(movie.release_date, None);
+    }
 
     #[test]
     fn retry_after_supports_seconds_dates_and_invalid_headers() {
