@@ -184,6 +184,13 @@ fn reject_continuation(tail: &str, episode: u32) -> anyhow::Result<()> {
     {
         return Ok(());
     }
+    let metadata_tail = tail.trim_start_matches([' ', '.', '_', '-']);
+    if JUNK_TAGS
+        .find(metadata_tail)
+        .is_some_and(|tag| tag.start() == 0)
+    {
+        return Ok(());
+    }
     if UNSUPPORTED_CONTINUATION.is_match(tail) {
         anyhow::bail!("unsupported episode sequence; use explicit endpoints such as S01E03-E04; file left unchanged");
     }
@@ -447,5 +454,19 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("unsupported episode sequence"));
+    }
+
+    #[test]
+    fn accepts_hyphen_before_resolution_metadata() {
+        assert_eq!(
+            parse_filename("gua-designatedsurvivor.s02e22-1080p").unwrap(),
+            Guess::Episode {
+                series: "Gua-designatedsurvivor".to_string(),
+                season: 2,
+                episode: 22,
+                episode_end: None,
+                year: None,
+            }
+        );
     }
 }
