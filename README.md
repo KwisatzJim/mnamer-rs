@@ -11,19 +11,23 @@ Breaking.Bad.S05E14.Ozymandias.720p.WEB-DL.mp4 -> Breaking Bad - S05E14 - Ozyman
 the.office.3x05.business.school.avi           -> The Office - S03E05 - Business School.avi
 ```
 
-<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 01 PM" src="https://github.com/user-attachments/assets/f4f5aa2e-4924-4763-8a34-e9520fca6358" />
+## Screenshots
 
-<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 09 PM" src="https://github.com/user-attachments/assets/73651a94-ab39-490c-96a6-c8372071ab16" />
+| Screenshot 1 | Screenshot 2 |
+| --- | --- |
+| <img src="https://github.com/user-attachments/assets/f4f5aa2e-4924-4763-8a34-e9520fca6358" alt="mnamer-rs screenshot 1" width="500"> | <img src="https://github.com/user-attachments/assets/73651a94-ab39-490c-96a6-c8372071ab16" alt="mnamer-rs screenshot 2" width="500"> |
 
-<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 16 PM" src="https://github.com/user-attachments/assets/9cff9f78-2b90-40e0-82d1-6e01a758d6d5" />
+| Screenshot 3 | Screenshot 4 |
+| --- | --- |
+| <img src="https://github.com/user-attachments/assets/9cff9f78-2b90-40e0-82d1-6e01a758d6d5" alt="mnamer-rs screenshot 3" width="500"> | <img src="https://github.com/user-attachments/assets/71b78f3d-a181-4fa1-987c-6053bcc48269" alt="mnamer-rs screenshot 4" width="500"> |
 
-<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 23 PM" src="https://github.com/user-attachments/assets/71b78f3d-a181-4fa1-987c-6053bcc48269" />
+| Screenshot 5 | Screenshot 6 |
+| --- | --- |
+| <img src="https://github.com/user-attachments/assets/5e2ca8a0-ddd6-45cd-9f0c-efed6df73f26" alt="mnamer-rs screenshot 5" width="500"> | <img src="https://github.com/user-attachments/assets/113695f3-63df-4269-95a4-e2d19aa83211" alt="mnamer-rs screenshot 6" width="500"> |
 
-<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 33 PM" src="https://github.com/user-attachments/assets/5e2ca8a0-ddd6-45cd-9f0c-efed6df73f26" />
-
-<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 39 PM" src="https://github.com/user-attachments/assets/113695f3-63df-4269-95a4-e2d19aa83211" />
-
-<img width="1091" height="700" alt="Screenshot 2026-09-06 at 4 07 48 PM" src="https://github.com/user-attachments/assets/6dcc5e2d-d8f6-4ad1-b143-18d41c9e4e04" />
+| Screenshot 7 |
+| --- |
+| <img src="https://github.com/user-attachments/assets/6dcc5e2d-d8f6-4ad1-b143-18d41c9e4e04" alt="mnamer-rs screenshot 7" width="500"> |
 
 ## Building
 
