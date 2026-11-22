@@ -17,7 +17,7 @@ jobs:
         include:
           - os: ubuntu-22.04
             asset: mnamer-rs-linux-x86_64
-          - os: macos-14
+          - os: macos-15
             asset: mnamer-rs-macos-aarch64
     runs-on: ${{ matrix.os }}
     steps:
